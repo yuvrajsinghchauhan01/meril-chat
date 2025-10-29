@@ -83,6 +83,8 @@ export default function Home(props: HomeProps) {
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [selectedConvId, setSelectedConvId] = useState<number | null>(null);
+  // Conversations sidebar search
+  const [conversationSearch, setConversationSearch] = useState("");
   // Search mode state
   const [searchMode, setSearchMode] = useState(false);
   // Global search modal state
@@ -92,6 +94,9 @@ export default function Home(props: HomeProps) {
   // Success message state
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const { projects } = useProjects();
+  // Attachment state
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
 
   const toggleProjectChat = () => {
     setShowProjectChat(prev => !prev);
@@ -310,7 +315,22 @@ export default function Home(props: HomeProps) {
                     className="w-full bg-transparent outline-none text-xs sm:text-sm"
                     style={{ color: 'var(--text-secondary)', '--placeholder-color': 'var(--text-tertiary)' } as React.CSSProperties & { '--placeholder-color': string }}
                     placeholder="Search..."
+                    value={conversationSearch}
+                    onChange={(e) => setConversationSearch(e.target.value)}
                   />
+                  {conversationSearch && (
+                    <button
+                      type="button"
+                      className="p-1 rounded hover:bg-[var(--bg-hover)] transition-colors"
+                      title="Clear search"
+                      onClick={() => setConversationSearch("")}
+                      style={{ color: 'var(--text-tertiary)' }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
                 {/* Conversations List */}
                 <div className="mt-4 flex-1 overflow-y-auto overflow-x-visible rounded-lg" style={{ border: '1px solid var(--border-secondary)' }}>
@@ -318,7 +338,16 @@ export default function Home(props: HomeProps) {
                     <div className="p-3 text-xs" style={{ color: 'var(--text-tertiary)' }}>No conversations yet</div>
                   ) : (
                     <ul className="divide-y relative" style={{ borderColor: 'var(--border-secondary)' }}>
-                      {conversations.map(c => (
+                      {conversations
+                        .filter(c => {
+                          const q = conversationSearch.trim().toLowerCase();
+                          if (!q) return true;
+                          const title = (c.title || `Chat #${c.id}`).toLowerCase();
+                          const modelId = (c.model_id || '').toLowerCase();
+                          const idStr = String(c.id);
+                          return title.includes(q) || modelId.includes(q) || idStr.includes(q);
+                        })
+                        .map(c => (
                         <li
                             key={c.id}
                             className="group flex items-center gap-3 px-3 py-2.5 cursor-pointer relative rounded-xl border transition-all duration-200"
@@ -485,6 +514,17 @@ export default function Home(props: HomeProps) {
                           )}
                         </li>
                       ))}
+                      {conversationSearch.trim() && conversations.filter(c => {
+                        const q = conversationSearch.trim().toLowerCase();
+                        const title = (c.title || `Chat #${c.id}`).toLowerCase();
+                        const modelId = (c.model_id || '').toLowerCase();
+                        const idStr = String(c.id);
+                        return title.includes(q) || modelId.includes(q) || idStr.includes(q);
+                      }).length === 0 && (
+                        <li className="px-3 py-2.5 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          No conversations match "{conversationSearch}"
+                        </li>
+                      )}
                       {/* Modal for project selection */}
                       {showProjectModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -1037,7 +1077,7 @@ onClick={() => { if (!user && publicMode) { navigate('/login'); } else { useExam
                   </div>
                 )}
 <form
-                  onSubmit={(e) => { e.preventDefault(); (document.activeElement as HTMLElement | null)?.blur?.(); setEditing(null); setEditingActive(false); setJustSent(true); setTimeout(() => setJustSent(false), 600); if (!user && publicMode) { navigate('/login'); return; } handleSend(searchMode); }}
+                  onSubmit={(e) => { e.preventDefault(); (document.activeElement as HTMLElement | null)?.blur?.(); setEditing(null); setEditingActive(false); setJustSent(true); setTimeout(() => setJustSent(false), 600); if (!user && publicMode) { navigate('/login'); return; } if (attachedFile) { const hint = `\n\n[Attachment: ${attachedFile.name} (${Math.ceil(attachedFile.size/1024)} KB)]`; setMessage(message + hint); setAttachedFile(null); } handleSend(searchMode); }}
                   className="flex flex-col"
                 >
                   <input
@@ -1058,6 +1098,16 @@ value={message}
                       }
                     }}
                   />
+                  {attachedFile && (
+                    <div className="flex items-center gap-2 px-2 sm:px-3 py-1 text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+                      <span className="truncate max-w-[60%]">{attachedFile.name}</span>
+                      <span>({Math.ceil(attachedFile.size/1024)} KB)</span>
+                      <button type="button" className="ml-auto p-1 rounded hover:bg-[var(--bg-hover)]" title="Remove attachment" onClick={() => setAttachedFile(null)}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+                  )}
                   <div className='flex items-center justify-between flex-wrap gap-2'>
                     <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
                       {/* Model Selector Dropdown (paginated) */}
@@ -1082,7 +1132,8 @@ value={message}
                         </svg>
                         <span className="hidden sm:inline">{searchMode ? 'Search On' : 'Search'}</span>
                       </button>
-                      <button type="button" className="p-1.5 sm:p-2 rounded-lg transition-colors" style={{ '--hover-bg': 'var(--bg-hover-light)' } as React.CSSProperties & { '--hover-bg': string }}>
+                      <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const file = e.target.files?.[0] || null; if (file) { const max = 10 * 1024 * 1024; if (file.size > max) { setSuccessMessage('Error: File is larger than 10MB'); setTimeout(() => setSuccessMessage(null), 3000); e.currentTarget.value = ''; return; } setAttachedFile(file); } }} />
+                      <button type="button" className="p-1.5 sm:p-2 rounded-lg transition-colors" style={{ '--hover-bg': 'var(--bg-hover-light)' } as React.CSSProperties & { '--hover-bg': string }} onClick={() => { if (!user && publicMode) { navigate('/login'); return; } fileInputRef.current?.click(); }} title="Attach a file">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="sm:w-5 sm:h-5">
                           <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                         </svg>
