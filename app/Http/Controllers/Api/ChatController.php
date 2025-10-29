@@ -1207,6 +1207,9 @@ class ChatController extends Controller
 
             // Return streaming response using Http client
             return response()->stream(function () use ($payload, $conversationId, $apiKey, $siteUrl, $siteName, $baseUrl, $request) {
+                // Disable output buffering for true streaming
+                if (ob_get_level()) ob_end_clean();
+                
                 $fullContent = '';
                 
                 try {
@@ -1221,33 +1224,37 @@ class ChatController extends Controller
 
                     // Process the stream
                     $body = $response->toPsrResponse()->getBody();
+                    $buffer = '';
                     
                     while (!$body->eof()) {
-                        $chunk = $body->read(8192);
-                        echo $chunk;
+                        $chunk = $body->read(256); // Smaller chunks for better streaming
                         
-                        // Parse the SSE data to accumulate content
-                        $lines = explode("\n", $chunk);
-                        foreach ($lines as $line) {
-                            if (str_starts_with($line, 'data: ')) {
-                                $jsonData = trim(substr($line, 6));
-                                if ($jsonData !== '[DONE]' && !empty($jsonData)) {
-                                    try {
-                                        $decoded = json_decode($jsonData, true);
-                                        if (isset($decoded['choices'][0]['delta']['content'])) {
-                                            $fullContent .= $decoded['choices'][0]['delta']['content'];
+                        if ($chunk !== false && $chunk !== '') {
+                            // Immediately output the chunk
+                            echo $chunk;
+                            flush();
+                            
+                            // Parse the SSE data to accumulate content
+                            $buffer .= $chunk;
+                            $lines = explode("\n", $buffer);
+                            $buffer = array_pop($lines); // Keep incomplete line in buffer
+                            
+                            foreach ($lines as $line) {
+                                if (str_starts_with($line, 'data: ')) {
+                                    $jsonData = trim(substr($line, 6));
+                                    if ($jsonData !== '[DONE]' && !empty($jsonData)) {
+                                        try {
+                                            $decoded = json_decode($jsonData, true);
+                                            if (isset($decoded['choices'][0]['delta']['content'])) {
+                                                $fullContent .= $decoded['choices'][0]['delta']['content'];
+                                            }
+                                        } catch (\Exception $e) {
+                                            // Ignore JSON parse errors
                                         }
-                                    } catch (\Exception $e) {
-                                        // Ignore JSON parse errors
                                     }
                                 }
                             }
                         }
-                        
-                        if (ob_get_level() > 0) {
-                            ob_flush();
-                        }
-                        flush();
                     }
 
                     // After streaming is complete, save the assistant message

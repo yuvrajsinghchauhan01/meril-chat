@@ -5,9 +5,10 @@ interface GlobalSearchProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectResult: (result: SearchResult) => void;
+  onAskAI?: (query: string, webResults: SearchResult[]) => void;
 }
 
-const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose, onSelectResult }) => {
+const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose, onSelectResult, onAskAI }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -296,6 +297,30 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose, onSelectRe
               Quick Actions:
             </div>
             <div className="flex gap-2 flex-wrap">
+              {/* Ask AI button - only show if there are web results and onAskAI is provided */}
+              {onAskAI && results.filter(r => r.type === 'web').length > 0 && (
+                <button
+                  onClick={() => {
+                    const webResults = results.filter(r => r.type === 'web');
+                    onAskAI(query, webResults);
+                    onClose();
+                  }}
+                  className="px-3 py-1.5 rounded-md text-sm transition-colors font-medium"
+                  style={{
+                    backgroundColor: 'var(--accent-primary)',
+                    color: 'white',
+                    border: '1px solid var(--accent-primary)'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = 'var(--accent-hover)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'var(--accent-primary)';
+                  }}
+                >
+                  ✨ Ask AI about these results
+                </button>
+              )}
               <button
                 onClick={() => handleSearch(`latest news about ${query}`)}
                 className="px-3 py-1.5 rounded-md text-sm transition-colors"
