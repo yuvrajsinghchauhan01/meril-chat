@@ -673,25 +673,6 @@ export default function Home(props: HomeProps) {
             
             <div className="flex items-center gap-1 sm:gap-2">
               <button 
-                onClick={() => setGlobalSearchOpen(true)}
-                className="p-1.5 sm:p-2 rounded-lg transition-colors" 
-                style={{ color: 'var(--text-secondary)' }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
-                  e.currentTarget.style.color = 'var(--text-primary)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = 'var(--text-secondary)';
-                }}
-                title="Search (Ctrl+K)"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="sm:w-[18px] sm:h-[18px]">
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.35-4.35" />
-                </svg>
-              </button>
-              <button 
                 onClick={() => navigate('/settings')}
                 className="p-1.5 sm:p-2 rounded-lg transition-colors" 
                 style={{ color: 'var(--text-secondary)' }}

@@ -180,66 +180,92 @@ function AppContent() {
     setItems(prev => [...prev, userItem])
     setMessage('')
     
-    // If in search mode, perform search instead of AI chat
+    // If in search mode, fetch top results and feed them into the model
     if (searchMode) {
       try {
-        // Show searching indicator
-        const searchingItem: ChatItem = {
-          id: generateUUID(),
-          role: 'assistant',
-          content: 'Searching...',
-          isSearchResult: true
-        }
-        setItems(prev => [...prev, searchingItem])
-        
-        // Perform search
+        const searchingId = generateUUID()
+        setItems(prev => [...prev, { id: searchingId, role: 'assistant', content: 'Searching top results...' }])
+
+        // Get top results across sources
         const searchResponse = await SearchAPI.search({
           query: text,
           type: 'all',
-          limit: 10
+          limit: 6,
         })
-        
-        // Remove searching indicator and show results
-        setItems(prev => prev.filter(item => item.id !== searchingItem.id))
-        
-        if (searchResponse.results.length > 0) {
-          const searchResultItem: ChatItem = {
-            id: generateUUID(),
-            role: 'assistant',
-            content: `Found ${searchResponse.results.length} results for "${text}"`,
-            isSearchResult: true,
-            searchResults: searchResponse.results.map(result => ({
-              id: result.id,
-              type: result.type,
-              title: result.title,
-              snippet: result.snippet,
-              url: result.url,
-              created_at: result.created_at,
-              conversation_id: result.conversation_id
-            }))
-          }
-          setItems(prev => [...prev, searchResultItem])
+
+        // Remove temporary searching message
+        setItems(prev => prev.filter(it => it.id !== searchingId))
+
+        // Prefer web results from Tavily; fall back to any results
+        const allResults = searchResponse.results || []
+        const webOnly = allResults.filter(r => r.type === 'web')
+        const top = (webOnly.length > 0 ? webOnly : allResults).slice(0, 3)
+        if (top.length === 0) {
+          // Proceed with normal chat without web context
+          // Recurse into normal path by simulating not in search mode
+          // Note: avoid infinite loop by directly executing the normal send flow below
         } else {
-          const noResultsItem: ChatItem = {
-            id: generateUUID(),
-            role: 'assistant',
-            content: `No results found for "${text}". Try different keywords or check your spelling.`,
-            isSearchResult: true
+          if (!selectedModel) {
+            const assistantItem: ChatItem = {
+              id: generateUUID(),
+              role: 'assistant',
+              content: `I found a few sources but no model is selected to compose an answer.`,
+            }
+            setItems(prev => [...prev, assistantItem])
+            return
           }
-          setItems(prev => [...prev, noResultsItem])
+
+          // Build a concise context block from the top results
+          const sourcesBlock = top
+            .map((r, i) => {
+              const main = r.content && r.content.length > (r.snippet?.length || 0) ? r.content : r.snippet
+              return `Source ${i + 1}: ${r.title}\n${main}${r.url ? `\nURL: ${r.url}` : ''}`
+            })
+            .join('\n\n')
+
+          const systemWithContext = generateWebSearchSystemPrompt(
+            `Use the following verified web results to answer the user's question accurately.\n\n${sourcesBlock}\n\nGuidelines:\n- Do not list links.\n- Synthesize a single, helpful answer using the context.\n- If you cite, refer to (Source 1/2/3).\n- If evidence is weak or conflicting, say so.`
+          )
+
+          const assistantId = generateUUID()
+          let accumulated = ''
+          setItems(prev => [...prev, { id: assistantId, role: 'assistant', content: '', webSearchUsed: true, searchQuery: text }])
+
+          try {
+            const meta = await ChatAPI.sendStream(
+              {
+                model: selectedModel,
+                message: text,
+                conversation_id: conversationId ?? undefined,
+                system_prompt: systemWithContext,
+              },
+              (token) => {
+                accumulated += token
+                setItems(prev => prev.map(it => it.id === assistantId ? { ...it, content: accumulated } : it))
+              },
+              (info) => {
+                if (info?.conversation_id && !conversationId) {
+                  setConversationId(info.conversation_id)
+                }
+              }
+            )
+
+            if (meta?.conversation_id && !conversationId) {
+              setConversationId(meta.conversation_id)
+            }
+            try { setConversations(await ConversationsAPI.list()) } catch {}
+          } catch (e: any) {
+            setItems(prev => prev.map(it => it.id === assistantId ? { ...it, content: `Error contacting server: ${e?.message ?? 'Unknown error'}` } : it))
+          }
+          return
         }
-        
       } catch (error) {
         console.error('Search failed:', error)
-        const errorItem: ChatItem = {
-          id: generateUUID(),
-          role: 'assistant',
-          content: 'Search failed. Please try again.',
-          isSearchResult: true
-        }
+        const errorItem: ChatItem = { id: generateUUID(), role: 'assistant', content: 'Search failed. Please try again.' }
         setItems(prev => [...prev, errorItem])
+        return
       }
-      return
+      // fall-through to normal chat if no results
     }
 
     ;(async () => {
