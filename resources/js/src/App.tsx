@@ -180,108 +180,62 @@ function AppContent() {
     setItems(prev => [...prev, userItem])
     setMessage('')
     
-    // If in search mode, perform search and then use AI to answer based on results
+    // If in search mode, perform search instead of AI chat
     if (searchMode) {
-      if (!selectedModel) {
-        const assistantItem: ChatItem = {
-          id: generateUUID(),
-          role: 'assistant',
-          content: 'Please select a model to use search mode.',
-        }
-        setItems(prev => [...prev, assistantItem])
-        return
-      }
-
       try {
         // Show searching indicator
         const searchingItem: ChatItem = {
           id: generateUUID(),
           role: 'assistant',
-          content: 'Searching the web...',
-          isSearchResult: false
+          content: 'Searching...',
+          isSearchResult: true
         }
         setItems(prev => [...prev, searchingItem])
         
-        // Perform web search to get Tavily results
+        // Perform search
         const searchResponse = await SearchAPI.search({
           query: text,
-          type: 'web',  // Only search web for Tavily results
-          limit: 8
+          type: 'all',
+          limit: 10
         })
         
-        // Remove searching indicator
+        // Remove searching indicator and show results
         setItems(prev => prev.filter(item => item.id !== searchingItem.id))
         
-        // Filter out web results
-        const webResults = searchResponse.results.filter(r => r.type === 'web')
-        
-        if (webResults.length === 0) {
+        if (searchResponse.results.length > 0) {
+          const searchResultItem: ChatItem = {
+            id: generateUUID(),
+            role: 'assistant',
+            content: `Found ${searchResponse.results.length} results for "${text}"`,
+            isSearchResult: true,
+            searchResults: searchResponse.results.map(result => ({
+              id: result.id,
+              type: result.type,
+              title: result.title,
+              snippet: result.snippet,
+              url: result.url,
+              created_at: result.created_at,
+              conversation_id: result.conversation_id
+            }))
+          }
+          setItems(prev => [...prev, searchResultItem])
+        } else {
           const noResultsItem: ChatItem = {
             id: generateUUID(),
             role: 'assistant',
-            content: `No web search results found for "${text}". Please try a different query.`,
+            content: `No results found for "${text}". Try different keywords or check your spelling.`,
+            isSearchResult: true
           }
           setItems(prev => [...prev, noResultsItem])
-          return
         }
-        
-        // Format search results as context for the AI model
-        // Limit content to avoid exceeding system prompt character limit (2000 chars)
-        const searchContext = webResults.slice(0, 5).map((result, idx) => {
-          const content = result.content || result.snippet || '';
-          // Limit each result to 200 characters
-          const truncatedContent = content.length > 200 ? content.substring(0, 200) + '...' : content;
-          return `[${idx + 1}] ${result.title}\n${truncatedContent}\nURL: ${result.url || 'N/A'}`;
-        }).join('\n\n')
-        
-        // Create system prompt with search results (keep under 2000 characters)
-        const searchSystemPrompt = `You are a helpful AI assistant. Answer based on these web search results:
-
-${searchContext}
-
-Instructions: Use the above sources to answer. Cite sources when relevant. Be concise.`
-
-        // Now send to AI model with search context
-        const assistantId = generateUUID()
-        let accumulated = ''
-        setItems(prev => [...prev, { 
-          id: assistantId, 
-          role: 'assistant', 
-          content: '', 
-          webSearchUsed: true,
-          searchQuery: text
-        }])
-        
-        const meta = await ChatAPI.sendStream(
-          {
-            model: selectedModel,
-            message: text,
-            conversation_id: conversationId ?? undefined,
-            system_prompt: searchSystemPrompt,
-          },
-          (token) => {
-            accumulated += token
-            setItems(prev => prev.map(it => it.id === assistantId ? { ...it, content: accumulated } : it))
-          },
-          (info) => {
-            if (info?.conversation_id && !conversationId) {
-              setConversationId(info.conversation_id)
-            }
-          }
-        )
-
-        if (meta?.conversation_id && !conversationId) {
-          setConversationId(meta.conversation_id)
-        }
-        // Refresh the conversation list in sidebar
-        try { setConversations(await ConversationsAPI.list()) } catch {}
         
       } catch (error) {
-        console.error('Search mode failed:', error)
+        console.error('Search failed:', error)
         const errorItem: ChatItem = {
           id: generateUUID(),
           role: 'assistant',
-          content: `Search failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+          content: 'Search failed. Please try again.',
+          isSearchResult: true
         }
         setItems(prev => [...prev, errorItem])
       }

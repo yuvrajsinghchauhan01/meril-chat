@@ -147,24 +147,8 @@ input::placeholder {
 .markdown-body {
   line-height: 1.6;
   color: inherit; /* Inherit color from parent container */
-  word-wrap: break-word;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  max-width: 100%;
-  overflow-x: hidden;
-  hyphens: auto;
 }
-
-.markdown-body * {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-.markdown-body p { 
-  margin: 0.5rem 0;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
+.markdown-body p { margin: 0.5rem 0; }
 .markdown-body h1, .markdown-body h2, .markdown-body h3,
 .markdown-body h4, .markdown-body h5, .markdown-body h6 {
   margin: 0.75rem 0 0.5rem;
@@ -186,9 +170,6 @@ input::placeholder {
   overflow-x: auto;
   margin: 0.75rem 0;
   color: #f8f8f2 !important; /* Ensure code text is visible */
-  max-width: 100%;
-  white-space: pre-wrap;
-  word-wrap: break-word;
 }
 .markdown-body pre code {
   background: transparent !important;

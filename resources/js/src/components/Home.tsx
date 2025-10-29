@@ -11,6 +11,8 @@ import { ProjectsAPI } from '../api/client';
 import ProjectChat from './ProjectChat';
 import ModelSelector from './ModelSelector';
 import Markdown from './Markdown';
+import GlobalSearch from './GlobalSearch';
+import type { SearchResult } from '../api/client';
 
 interface HomeProps {
   message: string;
@@ -83,6 +85,8 @@ export default function Home(props: HomeProps) {
   const [selectedConvId, setSelectedConvId] = useState<number | null>(null);
   // Search mode state
   const [searchMode, setSearchMode] = useState(false);
+  // Global search modal state
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   // Copy state for showing feedback
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   // Success message state
@@ -93,6 +97,16 @@ export default function Home(props: HomeProps) {
     setShowProjectChat(prev => !prev);
   };
 
+  // Handle GlobalSearch result selection
+  const handleGlobalSearchResult = (result: SearchResult) => {
+    if (result.type === 'conversation' && result.conversation_id) {
+      openConversation(result.conversation_id);
+    } else if (result.type === 'message' && result.conversation_id) {
+      openConversation(result.conversation_id);
+    } else if (result.type === 'web' && result.url) {
+      window.open(result.url, '_blank');
+    }
+  };
 
   // Copy message content to clipboard
   const handleCopyMessage = async (content: string, messageId: string) => {
@@ -173,6 +187,18 @@ export default function Home(props: HomeProps) {
     }
   }, [menuOpenId]);
 
+  // Global search keyboard shortcut
+  useEffect(() => {
+    const handleGlobalSearch = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
+        event.preventDefault();
+        setGlobalSearchOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleGlobalSearch);
+    return () => document.removeEventListener('keydown', handleGlobalSearch);
+  }, []);
   
 
   return (
@@ -646,7 +672,26 @@ export default function Home(props: HomeProps) {
             </div>
             
             <div className="flex items-center gap-1 sm:gap-2">
-              <button
+              <button 
+                onClick={() => setGlobalSearchOpen(true)}
+                className="p-1.5 sm:p-2 rounded-lg transition-colors" 
+                style={{ color: 'var(--text-secondary)' }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                }}
+                title="Search (Ctrl+K)"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="sm:w-[18px] sm:h-[18px]">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.35-4.35" />
+                </svg>
+              </button>
+              <button 
                 onClick={() => navigate('/settings')}
                 className="p-1.5 sm:p-2 rounded-lg transition-colors" 
                 style={{ color: 'var(--text-secondary)' }}
@@ -730,8 +775,8 @@ onClick={() => { if (!user && publicMode) { navigate('/login'); } else { useExam
                 ) : (
                   <div className="flex flex-col gap-4">
                     {items.map((it) => (
-                        <div key={it.id} className={`group relative w-full flex ${it.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className="relative max-w-[85%]">
+                        <div key={it.id} className={`group relative max-w-[85%] flex ${it.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className="relative">
                         <div
                           className={`rounded-2xl px-4 py-3 text-[15px]`}
                           style={{
@@ -741,11 +786,7 @@ onClick={() => { if (!user && publicMode) { navigate('/login'); } else { useExam
                             border: `1px solid ${it.role === 'user' 
                               ? theme === 'dark' ? 'var(--border-secondary)' : '#fecaca'
                               : theme === 'dark' ? 'var(--border-secondary)' : '#bfdbfe'}`,
-                            color: 'var(--text-primary)',
-                            wordBreak: 'break-word',
-                            overflowWrap: 'anywhere',
-                            maxWidth: '100%',
-                            overflow: 'hidden'
+                            color: 'var(--text-primary)'
                           }}
                         >
                           {editingActive && !justSent && editing && typeof it.apiId === 'number' && editing.id === it.apiId && it.role === 'user' ? (
@@ -995,7 +1036,26 @@ onClick={() => { if (!user && publicMode) { navigate('/login'); } else { useExam
                 backgroundColor: 'var(--bg-secondary)',
                 boxShadow: searchMode ? '0 0 0 3px rgba(59, 130, 246, 0.1)' : 'var(--shadow-tertiary)'
               }}>
-                <form
+                {/* Search Mode Indicator */}
+                {searchMode && (
+                  <div className="flex items-center gap-2 mb-2 px-2 py-1 rounded-md" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="m21 21-4.35-4.35" />
+                    </svg>
+                    <span className="text-xs font-medium">Search Mode Active - Press Enter to search</span>
+                    <button 
+                      onClick={() => setSearchMode(false)}
+                      className="ml-auto p-1 rounded hover:bg-[rgba(59, 130, 246, 0.2)] transition-colors"
+                      title="Exit search mode"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+<form
                   onSubmit={(e) => { e.preventDefault(); (document.activeElement as HTMLElement | null)?.blur?.(); setEditing(null); setEditingActive(false); setJustSent(true); setTimeout(() => setJustSent(false), 600); if (!user && publicMode) { navigate('/login'); return; } handleSend(searchMode); }}
                   className="flex flex-col"
                 >
@@ -1086,6 +1146,12 @@ value={message}
         </main>
       </div>
       
+      {/* Global Search Modal */}
+      <GlobalSearch
+        isOpen={globalSearchOpen}
+        onClose={() => setGlobalSearchOpen(false)}
+        onSelectResult={handleGlobalSearchResult}
+      />
       
       {/* Copy Success Toast */}
       {copiedMessageId && (
