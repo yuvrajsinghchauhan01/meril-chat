@@ -5,7 +5,10 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\ModelController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\SearchController;
+use App\Http\Controllers\Api\AuthApiController;
 
 
 // Test route to verify API is working
@@ -37,10 +40,6 @@ Route::prefix('models')->group(function () {
 // });
 
 
-// All chat, conversation, message, and project routes are now protected by auth:sanctum middleware below
-
-use App\Http\Controllers\Api\AuthApiController;
-
 // Note: Fortify handles /api/login and /api/register automatically
 
 // Temporary test route for search functionality (REMOVE IN PRODUCTION)
@@ -59,45 +58,29 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/refresh', [AuthApiController::class, 'refresh']);
     // Note: Fortify handles password updates via /api/user/password
     
-    // Chat routes (protected)
+    // Chat routes (protected) - non-RESTful endpoints for AI chat
     Route::prefix('chat')->group(function () {
         Route::post('/', [ChatController::class, 'chat']);
         Route::post('/stream', [ChatController::class, 'stream']);
     });
 
-    // Conversation routes (protected)
-    Route::prefix('conversations')->group(function () {
-        Route::get('/', [ChatController::class, 'conversations']);
-        Route::get('/{id}', [ChatController::class, 'show']);
-        Route::put('/{id}', [ChatController::class, 'update']);
-        Route::delete('/{id}', [ChatController::class, 'destroy']);
-    });
+    // Conversations (RESTful API resource)
+    Route::apiResource('conversations', ConversationController::class);
 
-    // Message management routes (protected)
-    Route::prefix('messages')->group(function () {
-        Route::put('/{id}', [ChatController::class, 'editMessage']);
-        Route::delete('/{id}', [ChatController::class, 'deleteMessage']);
-        Route::post('/{id}/regenerate', [ChatController::class, 'regenerateMessage']);
-        Route::post('/{id}/edit-and-continue', [ChatController::class, 'editAndContinue']);
-    });
+    // Messages (RESTful API resource)
+    Route::apiResource('messages', MessageController::class);
+    // Custom message actions
+    Route::post('messages/{message}/regenerate', [MessageController::class, 'regenerate']);
+    Route::post('messages/{message}/edit-and-continue', [MessageController::class, 'editAndContinue']);
 
-    // Project routes (protected)
-    Route::prefix('projects')->group(function () {
-        Route::get('/', [ProjectController::class, 'index']);
-        Route::post('/', [ProjectController::class, 'store']);
-        Route::get('/{id}', [ProjectController::class, 'show']);
-        Route::put('/{id}', [ProjectController::class, 'update']);
-        Route::delete('/{id}', [ProjectController::class, 'destroy']);
-        
-        // Project conversations
-        Route::get('/{id}/conversations', [ProjectController::class, 'conversations']);
-        Route::post('/{id}/conversations', [ProjectController::class, 'createConversation']);
-        Route::post('/{id}/conversations/add', [ProjectController::class, 'addConversations']);
-        Route::delete('/{projectId}/conversations/{conversationId}', [ProjectController::class, 'removeConversation']);
-        
-        // Archive toggle
-        Route::post('/{id}/archive', [ProjectController::class, 'toggleArchive']);
-    });
+    // Projects (RESTful API resource)
+    Route::apiResource('projects', ProjectController::class);
+    // Custom project actions
+    Route::get('projects/{project}/conversations', [ProjectController::class, 'conversations']);
+    Route::post('projects/{project}/conversations', [ProjectController::class, 'createConversation']);
+    Route::post('projects/{project}/conversations/add', [ProjectController::class, 'addConversations']);
+    Route::delete('projects/{project}/conversations/{conversation}', [ProjectController::class, 'removeConversation']);
+    Route::post('projects/{project}/archive', [ProjectController::class, 'toggleArchive']);
     
     // Search routes
     Route::prefix('search')->group(function () {
