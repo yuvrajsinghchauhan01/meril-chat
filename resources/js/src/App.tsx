@@ -48,12 +48,32 @@ export const SUGGESTIONS: Suggestion[] = [
   { icon: '🎓', label: 'Learn' },
 ]
 
-export const EXAMPLE_PROMPTS = [
-  'How does AI work?',
-  'Are black holes real?',
-  'How many Rs are in the word "strawberry"?',
-  'What is the meaning of life?',
-]
+export const CATEGORY_PROMPTS: Record<string, string[]> = {
+  Create: [
+    'Write a short story about a robot discovering emotions',
+    'Help me outline a sci-fi novel set in a post-apocalyptic world',
+    'Create a character profile for a complex villain with sympathetic motives',
+    'Give me 5 creative writing prompts for flash fiction',
+  ],
+  Explore: [
+    'Good books for fans of Rick Rubin',
+    'Countries ranked by number of corgis',
+    'Most successful companies in the world',
+    'How much does Claude cost?',
+  ],
+  Code: [
+    'Write code to invert a binary search tree in Python',
+    'What\'s the difference between Promise.all and Promise.allSettled?',
+    'Explain React\'s useEffect cleanup function',
+    'Best practices for error handling in async/await',
+  ],
+  Learn: [
+    'Beginner\'s guide to TypeScript',
+    'Explain the CAP theorem in distributed systems',
+    'Why is AI so expensive?',
+    'Are black holes real?',
+  ],
+}
 
 // Fallback models shown in dropdown when backend has no models yet
 const FALLBACK_MODELS: ApiModelItem[] = [
@@ -102,7 +122,7 @@ function AppContent() {
       setConversations([]);
       return;
     }
-    
+
     (async () => {
       try {
         const list = await ConversationsAPI.list()
@@ -163,7 +183,7 @@ function AppContent() {
   const handleSend = async (searchMode: boolean = false) => {
     const text = message.trim()
     if (!text || isStreaming) return
-    
+
     // If user is not authenticated and trying to chat (not search), show login message
     if (!user && !searchMode) {
       const userItem: ChatItem = { id: generateUUID(), role: 'user', content: text }
@@ -176,12 +196,12 @@ function AppContent() {
       setMessage('')
       return
     }
-    
+
     const userItem: ChatItem = { id: generateUUID(), role: 'user', content: text }
     setItems(prev => [...prev, userItem])
     setMessage('')
     setIsStreaming(true)
-    
+
     // If in search mode, fetch top results and feed them into the model
     if (searchMode) {
       try {
@@ -255,7 +275,7 @@ function AppContent() {
             if (meta?.conversation_id && !conversationId) {
               setConversationId(meta.conversation_id)
             }
-            try { setConversations(await ConversationsAPI.list()) } catch {}
+            try { setConversations(await ConversationsAPI.list()) } catch { }
           } catch (e: any) {
             setItems(prev => prev.map(it => it.id === assistantId ? { ...it, content: `Error contacting server: ${e?.message ?? 'Unknown error'}` } : it))
           } finally {
@@ -272,7 +292,7 @@ function AppContent() {
       // fall-through to normal chat if no results
     }
 
-    ;(async () => {
+    ; (async () => {
       if (!selectedModel) {
         const assistantItem: ChatItem = {
           id: generateUUID(),
@@ -286,10 +306,10 @@ function AppContent() {
       try {
         const assistantId = generateUUID()
         let accumulated = ''
-        setItems(prev => [...prev, { 
-          id: assistantId, 
-          role: 'assistant', 
-          content: '', 
+        setItems(prev => [...prev, {
+          id: assistantId,
+          role: 'assistant',
+          content: '',
           webSearchUsed: enableWebSearch,
           searchQuery: enableWebSearch ? searchContext.searchQuery : undefined
         }])
@@ -297,10 +317,10 @@ function AppContent() {
         // Analyze if this message would benefit from web search
         const searchContext = analyzeSearchContext(text);
         const isDef = isDefinitionQuery(text);
-        
+
         // Use web search for current events but not for definitions
         const enableWebSearch = searchContext.shouldUseWebSearch && !isDef;
-        
+
         console.log('Smart search analysis:', {
           query: text,
           shouldUseWebSearch: searchContext.shouldUseWebSearch,
@@ -309,7 +329,7 @@ function AppContent() {
           reason: searchContext.reason,
           searchQuery: searchContext.searchQuery
         });
-        
+
         const meta = await ChatAPI.sendStream(
           {
             model: selectedModel,
@@ -334,7 +354,7 @@ function AppContent() {
           setConversationId(meta.conversation_id)
         }
         // Refresh the conversation list in sidebar (best-effort)
-        try { setConversations(await ConversationsAPI.list()) } catch {}
+        try { setConversations(await ConversationsAPI.list()) } catch { }
       } catch (e: any) {
         const assistantItem: ChatItem = {
           id: generateUUID(),

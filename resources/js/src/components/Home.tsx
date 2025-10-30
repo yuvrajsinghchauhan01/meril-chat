@@ -4,7 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useProjects } from '../contexts/ProjectContext';
 import { useAuth } from '../contexts/AuthContext';
 import type { ChatItem } from '../App';
-import { SUGGESTIONS, EXAMPLE_PROMPTS } from '../App';
+import { SUGGESTIONS, CATEGORY_PROMPTS } from '../App';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { ApiModelItem, ApiConversation } from '../api/client';
 import { ProjectsAPI } from '../api/client';
@@ -96,6 +96,8 @@ export default function Home(props: HomeProps) {
   // Attachment state
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  // Category selection state
+  const [selectedCategory, setSelectedCategory] = useState<string>('Learn');
 
   const toggleProjectChat = () => setShowProjectChat(prev => !prev);
 
@@ -711,44 +713,39 @@ export default function Home(props: HomeProps) {
                       How can I help you?
                     </h1>
                     <div className="flex flex-wrap justify-center gap-2">
-                      {SUGGESTIONS.map((s) => (
-                        <button
-                          key={s.label}
-                          className="inline-flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-xs sm:text-sm transition-colors"
-                          style={{
-                            border: '1px solid var(--border-primary)',
-                            backgroundColor: 'var(--bg-quaternary)',
-                            color: 'var(--text-primary)'
-                          }}
-                          onClick={() => { if (!user && publicMode) { navigate('/login'); } else { useExample(s.label); } }}
-                          onMouseEnter={e => {
-                            e.currentTarget.style.backgroundColor = 'var(--bg-hover-light)';
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.backgroundColor = 'var(--bg-quaternary)';
-                          }}
-                        >
-                          <span>{s.icon}</span>
-                          {s.label}
-                        </button>
-                      ))}
+                      {SUGGESTIONS.map((s) => {
+                        const isActive = selectedCategory === s.label;
+                        return (
+                          <button
+                            key={s.label}
+                            className="inline-flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-xs sm:text-sm transition-colors"
+                            style={{
+                              border: `1px solid ${isActive ? 'var(--accent-primary)' : 'var(--border-primary)'}`,
+                              backgroundColor: isActive ? 'var(--accent-primary)' : 'var(--bg-quaternary)',
+                              color: isActive ? 'white' : 'var(--text-primary)'
+                            }}
+                            onClick={() => !user && publicMode ? navigate('/login') : setSelectedCategory(s.label)}
+                            onMouseEnter={e => !isActive && (e.currentTarget.style.backgroundColor = 'var(--bg-hover-light)')}
+                            onMouseLeave={e => !isActive && (e.currentTarget.style.backgroundColor = 'var(--bg-quaternary)')}
+                          >
+                            <span>{s.icon}</span>
+                            {s.label}
+                          </button>
+                        );
+                      })}
                     </div>
                     <ul className="mt-4 sm:mt-6 w-full max-w-[720px] list-none p-0" style={{ borderTop: '1px solid var(--border-tertiary)' }}>
-                      {EXAMPLE_PROMPTS.map((prompt, idx) => (
+                      {CATEGORY_PROMPTS[selectedCategory]?.map((prompt, idx, arr) => (
                         <li
                           key={idx}
                           className="py-2.5 sm:py-3.5 cursor-pointer transition-colors text-sm sm:text-[15px] px-2 sm:px-0"
                           style={{
                             color: 'var(--text-quaternary)',
-                            borderBottom: idx < EXAMPLE_PROMPTS.length - 1 ? '1px solid var(--border-tertiary)' : 'none'
+                            borderBottom: idx < arr.length - 1 ? '1px solid var(--border-tertiary)' : 'none'
                           }}
-                          onClick={() => { if (!user && publicMode) { navigate('/login'); } else { useExample(prompt); } }}
-                          onMouseEnter={e => {
-                            e.currentTarget.style.color = 'var(--text-primary)';
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.color = 'var(--text-quaternary)';
-                          }}
+                          onClick={() => !user && publicMode ? navigate('/login') : useExample(prompt)}
+                          onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
+                          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-quaternary)'}
                         >
                           {prompt}
                         </li>
