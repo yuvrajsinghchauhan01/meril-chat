@@ -20,7 +20,7 @@ const CreateProject = () => {
     const [files, setFiles] = useState<UploadedFile[]>([]);
     const [conversations, setConversations] = useState<Array<{
         id: number;
-        title?: string;
+        title?: string | null;
         project_id?: number;
         updated_at: string;
     }>>([]);
@@ -30,7 +30,7 @@ const CreateProject = () => {
     const { projectId } = useParams();
     const { projects, currentProject, setCurrentProject } = useProjects();
     const { user, logout } = useAuth();
-    
+
     // Load project when the page loads
     useEffect(() => {
         if (!projectId) {
@@ -77,7 +77,7 @@ const CreateProject = () => {
     // Function to fetch conversations
     const fetchConversations = useCallback(async () => {
         if (!currentProject?.id) return;
-        
+
         try {
             const all = await import('../api/client').then(m => m.ConversationsAPI.list());
             // Filter by project and ensure project_id is converted to string for comparison
@@ -127,11 +127,11 @@ const CreateProject = () => {
         try {
             const ConversationsAPI = (await import('../api/client')).ConversationsAPI;
             await ConversationsAPI.update(id, { title: newTitle });
-            
+
             // Update local state
-            setConversations(prevConvs => 
-                prevConvs.map(conv => 
-                    conv.id === id 
+            setConversations(prevConvs =>
+                prevConvs.map(conv =>
+                    conv.id === id
                         ? { ...conv, title: newTitle }
                         : conv
                 )
@@ -148,7 +148,7 @@ const CreateProject = () => {
         try {
             const ConversationsAPI = (await import('../api/client')).ConversationsAPI;
             await ConversationsAPI.delete(id);
-            
+
             // Update local state
             setConversations(prevConvs => prevConvs.filter(conv => conv.id !== id));
             if (selectedConversationId === id) {
@@ -162,33 +162,8 @@ const CreateProject = () => {
     };
 
     // Function to handle sharing a chat from main chatbot
-    const handleShareChat = async () => {
-        const chatId = prompt('Enter the chat ID to share:');
-        if (!chatId) return;
-
-        try {
-            const { ConversationsAPI, ChatAPI } = await import('../api/client');
-            
-            // Get the original conversation
-            const originalConv = await ConversationsAPI.get(Number(chatId));
-            
-            // Create a new conversation in the project
-            const newConv = await ConversationsAPI.create({
-                title: originalConv.title || 'Shared Chat',
-                project_id: currentProject?.id ? Number(currentProject.id) : undefined,
-                messages: originalConv.messages
-            });
-
-            // Add the new conversation to the list
-            setConversations(prev => [...prev, newConv]);
-            
-            // Select the new conversation
-            setSelectedConversationId(newConv.id);
-            setChatKey(k => k + 1);
-        } catch (error) {
-            console.error('Failed to share chat:', error);
-            alert('Failed to share chat. Please check the chat ID and try again.');
-        }
+    const handleShareChat = () => {
+        alert('Share chat functionality needs backend implementation');
     };
 
     const toggleMenu = (menu: keyof typeof menus) => {
@@ -229,14 +204,14 @@ const CreateProject = () => {
     );
 
     return (
-        <div className="min-h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)]">
+        <div className="h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
             {/* Header */}
-            <div className="flex items-center h-14 sm:h-16 px-4 sm:px-8 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+            <div className="flex items-center h-14 sm:h-16 px-4 sm:px-8 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
                 <div className="flex items-center gap-2">
-                    <button 
-                        onClick={() => navigate('/projectsPage')} 
+                    <button
+                        onClick={() => navigate('/projectsPage')}
                         className="flex items-center gap-2 text-sm sm:text-base transition-colors px-3 py-1.5 rounded-md"
-                        style={{ 
+                        style={{
                             color: 'var(--text-secondary)',
                             backgroundColor: 'var(--bg-quaternary)',
                             border: '1px solid var(--border-secondary)'
@@ -254,10 +229,10 @@ const CreateProject = () => {
                         <span className="hidden sm:inline">All projects</span>
                         <span className="sm:hidden">Back</span>
                     </button>
-                    <button 
-                        onClick={() => navigate('/')} 
+                    <button
+                        onClick={() => navigate('/')}
                         className="flex items-center gap-2 text-sm transition-colors px-3 py-1.5 rounded-md"
-                        style={{ 
+                        style={{
                             color: 'var(--text-secondary)',
                             backgroundColor: 'transparent',
                             border: '1px solid var(--border-secondary)'
@@ -282,8 +257,8 @@ const CreateProject = () => {
                         <div className="flex items-center gap-2">
                             <div className="flex items-center gap-2 text-[var(--text-secondary)] px-2 py-1 text-sm">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                    <circle cx="12" cy="7" r="4"/>
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                    <circle cx="12" cy="7" r="4" />
                                 </svg>
                                 <span className="hidden md:inline truncate max-w-[120px]">{user.email}</span>
                             </div>
@@ -318,10 +293,10 @@ const CreateProject = () => {
                         </div>
                     )}
                     <div className="relative">
-                        <button 
-                            onClick={() => toggleMenu('main')} 
+                        <button
+                            onClick={() => toggleMenu('main')}
                             className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg transition-colors"
-                            style={{ 
+                            style={{
                                 backgroundColor: 'var(--bg-quaternary)',
                                 border: '1px solid var(--border-secondary)',
                                 color: 'var(--text-secondary)'
@@ -345,26 +320,15 @@ const CreateProject = () => {
                                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
                             }}>
                                 {[
-                                    { 
-                                        icon: "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z", 
-                                        text: "Edit details" 
-                                    },
-                                    { 
-                                        icon: "M21 8v13H3V8M1 3h22v5H1z", 
-                                        text: "Archive" 
-                                    },
-                                    { 
-                                        icon: "M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", 
-                                        text: "Delete", 
-                                        isDestructive: true 
-                                    }
+                                    { icon: "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z", text: "Edit details" },
+                                    { icon: "M21 8v13H3V8M1 3h22v5H1z", text: "Archive" },
+                                    { icon: "M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", text: "Delete", isDestructive: true }
                                 ].map((item, i) => (
-                                    <button 
-                                        key={i} 
-                                        className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left transition-colors flex items-center gap-2 sm:gap-3 text-sm ${
-                                            i === 0 ? 'rounded-t-lg' : 
+                                    <button
+                                        key={i}
+                                        className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left transition-colors flex items-center gap-2 sm:gap-3 text-sm ${i === 0 ? 'rounded-t-lg' :
                                             i === 2 ? 'rounded-b-lg border-t' : ''
-                                        }`}
+                                            }`}
                                         style={{
                                             color: item.isDestructive ? '#ef4444' : 'var(--text-primary)',
                                             borderColor: i === 2 ? 'var(--border-primary)' : undefined
@@ -385,7 +349,7 @@ const CreateProject = () => {
                     </div>
 
                     <button className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg transition-colors"
-                        style={{ 
+                        style={{
                             backgroundColor: 'var(--bg-quaternary)',
                             border: '1px solid var(--border-secondary)',
                             color: 'var(--text-secondary)'
@@ -405,19 +369,19 @@ const CreateProject = () => {
             </div>
 
             {/* Project Name */}
-            <div className="px-4 sm:px-8 py-4 sm:py-6 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+            <div className="px-4 sm:px-8 py-4 sm:py-6 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
                 <h1 className="text-xl sm:text-2xl font-bold tracking-wide" style={{ color: 'var(--text-primary)' }}>{currentProject?.name || 'Project'}</h1>
             </div>
 
             {/* Main Content */}
-            <div className="flex flex-1">
+            <div className="flex flex-1 overflow-hidden">
                 {/* Left Sidebar - Conversations */}
-                <div className="w-80 border-r p-4 flex flex-col" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
+                <div className="w-80 border-r p-4 flex flex-col overflow-hidden" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
                     <div className="flex flex-col gap-2 mb-4">
                         <div className="flex items-center justify-between">
                             <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations</span>
-                            <button 
-                                onClick={handleNewChat} 
+                            <button
+                                onClick={handleNewChat}
                                 className="px-3 py-1.5 rounded-lg text-white text-sm flex items-center gap-2 transition-colors"
                                 style={{ backgroundColor: 'var(--accent-primary)' }}
                                 onMouseEnter={e => {
@@ -450,7 +414,7 @@ const CreateProject = () => {
                             Share Chat from Main
                         </button>
                     </div>
-                    
+
                     {conversations.length === 0 ? (
                         <div className="text-sm text-center py-4" style={{ color: 'var(--text-tertiary)' }}>
                             No conversations yet
@@ -463,8 +427,8 @@ const CreateProject = () => {
                                         <button
                                             className="w-full text-left p-3 rounded-lg transition-colors"
                                             style={{
-                                                backgroundColor: selectedConversationId === conv.id 
-                                                    ? 'var(--bg-hover-light)' 
+                                                backgroundColor: selectedConversationId === conv.id
+                                                    ? 'var(--bg-hover-light)'
                                                     : 'transparent',
                                                 fontWeight: selectedConversationId === conv.id ? '500' : 'normal'
                                             }}
@@ -474,8 +438,8 @@ const CreateProject = () => {
                                                 }
                                             }}
                                             onMouseLeave={e => {
-                                                e.currentTarget.style.backgroundColor = selectedConversationId === conv.id 
-                                                    ? 'var(--bg-hover-light)' 
+                                                e.currentTarget.style.backgroundColor = selectedConversationId === conv.id
+                                                    ? 'var(--bg-hover-light)'
                                                     : 'transparent';
                                             }}
                                             onClick={() => handleSelectConversation(conv.id)}
@@ -538,24 +502,24 @@ const CreateProject = () => {
                 </div>
 
                 {/* Main Chat Area */}
-                <div className="flex-1 flex flex-col">
-                        <div className="flex-1 p-6">
-                        <ProjectChatPanel 
-                            key={chatKey} 
-                            conversationId={selectedConversationId} 
-                            projectId={currentProject?.id} 
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    <div className="flex-1 overflow-hidden">
+                        <ProjectChatPanel
+                            key={chatKey}
+                            conversationId={selectedConversationId}
+                            projectId={currentProject?.id}
                         />
                     </div>
                 </div>
 
                 {/* Right Panel */}
-                <div className="w-full lg:w-[380px] flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 lg:p-8 lg:border-l border-[var(--border-primary)] lg:border-t-0 border-t">
+                <div className="w-full lg:w-[380px] flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 lg:p-8 lg:border-l border-[var(--border-primary)] lg:border-t-0 border-t overflow-y-auto">
                     {/* Instructions */}
                     <div className="rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-secondary)] p-4 sm:p-6">
                         <div className="flex items-center justify-between mb-3">
                             <span className="font-semibold text-sm sm:text-base" style={{ color: 'var(--text-primary)' }}>Instructions</span>
-                            <button 
-                                onClick={() => toggleMenu('modal')} 
+                            <button
+                                onClick={() => toggleMenu('modal')}
                                 className="p-1.5 rounded-md transition-colors"
                                 style={{ '--hover-bg': 'var(--bg-hover)' } as React.CSSProperties & { '--hover-bg': string }}
                                 onMouseEnter={e => {
@@ -576,10 +540,10 @@ const CreateProject = () => {
                         <div className="flex items-center justify-between mb-4">
                             <span className="font-semibold text-sm sm:text-base" style={{ color: 'var(--text-primary)' }}>Files</span>
                             <div className="relative">
-                                <button 
-                                    onClick={() => toggleMenu('file')} 
+                                <button
+                                    onClick={() => toggleMenu('file')}
                                     className="p-1.5 rounded-md transition-colors flex items-center justify-center"
-                                    style={{ 
+                                    style={{
                                         '--hover-bg': 'var(--bg-hover)',
                                         backgroundColor: 'var(--bg-quaternary)',
                                         border: '1px solid var(--border-secondary)',
@@ -602,8 +566,8 @@ const CreateProject = () => {
                                         borderColor: 'var(--border-primary)',
                                         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
                                     }}>
-                                        <button 
-                                            onClick={() => addFile('device')} 
+                                        <button
+                                            onClick={() => addFile('device')}
                                             className="w-full px-4 py-2.5 text-left transition-colors flex items-center gap-3 text-sm rounded-t-lg"
                                             style={{ color: 'var(--text-primary)' }}
                                             onMouseEnter={e => {
@@ -616,8 +580,8 @@ const CreateProject = () => {
                                             <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z" size={16} />
                                             Upload file
                                         </button>
-                                        <button 
-                                            onClick={() => addFile('text')} 
+                                        <button
+                                            onClick={() => addFile('text')}
                                             className="w-full px-4 py-2.5 text-left transition-colors flex items-center gap-3 text-sm"
                                             style={{ color: 'var(--text-primary)' }}
                                             onMouseEnter={e => {
@@ -630,8 +594,8 @@ const CreateProject = () => {
                                             <Icon d="M13 10V3L4 14h7v7l9-11h-7z" size={16} />
                                             Add text
                                         </button>
-                                        <button 
-                                            onClick={() => addFile('github')} 
+                                        <button
+                                            onClick={() => addFile('github')}
                                             className="w-full px-4 py-2.5 text-left transition-colors flex items-center gap-3 text-sm rounded-b-lg"
                                             style={{ color: 'var(--text-primary)' }}
                                             onMouseEnter={e => {
@@ -669,8 +633,8 @@ const CreateProject = () => {
                                                 <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{file.type} • {file.size}</p>
                                             </div>
                                         </div>
-                                        <button 
-                                            onClick={() => removeFile(file.id)} 
+                                        <button
+                                            onClick={() => removeFile(file.id)}
                                             className="p-1.5 rounded-md transition-colors"
                                             style={{ color: 'var(--text-tertiary)' }}
                                             onMouseEnter={e => {
@@ -705,8 +669,8 @@ const CreateProject = () => {
                     <div className="bg-[var(--bg-primary)] rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
                         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border-primary)]">
                             <h2 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">Project Instructions</h2>
-                            <button 
-                                onClick={cancelInstructions} 
+                            <button
+                                onClick={cancelInstructions}
                                 className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                             >
                                 <Icon d="M18 6L6 18M6 6l12 12" size={20} />
@@ -724,14 +688,14 @@ const CreateProject = () => {
                         </div>
 
                         <div className="flex justify-end gap-3 sm:gap-4 p-4 sm:p-6 border-t border-[var(--border-primary)]">
-                            <button 
-                                onClick={cancelInstructions} 
+                            <button
+                                onClick={cancelInstructions}
                                 className="px-4 sm:px-6 py-2 bg-transparent text-[var(--text-primary)] text-sm sm:text-base border border-[var(--border-primary)] rounded-lg hover:bg-[var(--bg-secondary)] transition-colors duration-200"
                             >
                                 Cancel
                             </button>
-                            <button 
-                                onClick={saveInstructions} 
+                            <button
+                                onClick={saveInstructions}
                                 className="px-4 sm:px-6 py-2 bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-sm sm:text-base rounded-lg hover:bg-[var(--bg-secondary)] border border-[var(--border-primary)] transition-colors duration-200"
                             >
                                 Save instructions

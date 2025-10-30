@@ -34,12 +34,12 @@ interface HomeProps {
   deleteConversation: (id: number) => Promise<void> | void;
   renameConversation: (id: number, title: string) => Promise<void> | void;
   // message actions
-  editMessage: (messageId: number, content: string) => Promise<void> | void;
-  deleteMessage: (messageId: number) => Promise<void> | void;
   regenerateMessage: (messageId: number) => Promise<void> | void;
   editAndContinue: (messageId: number, content: string) => Promise<void> | void;
   // when true, allow unauthenticated viewing and redirect to login on interaction
   publicMode?: boolean;
+  // streaming state
+  isStreaming?: boolean;
 }
 
 export default function Home(props: HomeProps) {
@@ -62,11 +62,10 @@ export default function Home(props: HomeProps) {
     openConversation,
     deleteConversation,
     renameConversation,
-    editMessage,
-    deleteMessage,
     regenerateMessage,
     editAndContinue,
     publicMode,
+    isStreaming = false,
   } = props;
   // Modal state for search and selection
   const [projectSearch, setProjectSearch] = useState("");
@@ -98,124 +97,96 @@ export default function Home(props: HomeProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
 
-  const toggleProjectChat = () => {
-    setShowProjectChat(prev => !prev);
-  };
+  const toggleProjectChat = () => setShowProjectChat(prev => !prev);
 
-  // Handle GlobalSearch result selection
   const handleGlobalSearchResult = (result: SearchResult) => {
-    if (result.type === 'conversation' && result.conversation_id) {
-      openConversation(result.conversation_id);
-    } else if (result.type === 'message' && result.conversation_id) {
+    if ((result.type === 'conversation' || result.type === 'message') && result.conversation_id) {
       openConversation(result.conversation_id);
     } else if (result.type === 'web' && result.url) {
       window.open(result.url, '_blank');
     }
   };
 
-  // Copy message content to clipboard
   const handleCopyMessage = async (content: string, messageId: string) => {
     try {
       await navigator.clipboard.writeText(content);
       setCopiedMessageId(messageId);
-      setTimeout(() => setCopiedMessageId(null), 2000); // Clear after 2 seconds
+      setTimeout(() => setCopiedMessageId(null), 2000);
     } catch (err) {
-      console.error('Failed to copy text: ', err);
+      console.error('Failed to copy:', err);
     }
   };
-  
 
-// Check authentication and redirect if needed (disabled in publicMode)
+  // Auto-scroll when messages change
   useEffect(() => {
-    if (!publicMode && !user) {
-      navigate('/login');
+    if (items.length > 0 && chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
+  }, [items]);
+
+
+  // Check authentication and redirect if needed
+  useEffect(() => {
+    if (!publicMode && !user) navigate('/login');
   }, [user, navigate, publicMode]);
 
   // Handle responsive behavior
   useEffect(() => {
-    const checkScreenSize = () => {
-      const isSmall = window.innerWidth < 768;
-      setIsSmallScreen(isSmall);
-    };
-
+    const checkScreenSize = () => setIsSmallScreen(window.innerWidth < 768);
     checkScreenSize();
     window.addEventListener('resize', checkScreenSize);
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  // Leave edit mode when switching conversations
+  // Leave edit mode when switching conversations or messages change
   useEffect(() => {
     setEditing(null);
     setEditingActive(false);
-  }, [conversationId]);
-
-  // Leave edit mode whenever the message list changes (e.g., after send)
-  useEffect(() => {
-    setEditing(null);
-    setEditingActive(false);
-  }, [items.length]);
-
-  // Leave edit mode when the main input is cleared (typically after send)
-  useEffect(() => {
-    if (message === '') { setEditing(null); setEditingActive(false); }
-  }, [message]);
+  }, [conversationId, items.length, message]);
 
   // Close conversation menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuOpenId !== null) {
-        // Check if the click is outside the menu and the three-dots button
-        const target = event.target as HTMLElement;
-        const isMenuButton = target.closest('[data-menu-button]');
-        const isMenu = target.closest('[data-menu]');
-        
-        if (!isMenuButton && !isMenu) {
-          setMenuOpenId(null);
-        }
-      }
-    };
-    
-    const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && menuOpenId !== null) {
+    if (menuOpenId === null) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-menu-button]') && !target.closest('[data-menu]')) {
         setMenuOpenId(null);
       }
     };
-    
-    if (menuOpenId !== null) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleEscKey);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-        document.removeEventListener('keydown', handleEscKey);
-      };
-    }
+    const handleEscKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpenId(null);
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscKey);
+    };
   }, [menuOpenId]);
 
-  // Global search keyboard shortcut
+  // Global search keyboard shortcut (Ctrl/Cmd+K)
   useEffect(() => {
-    const handleGlobalSearch = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
-        event.preventDefault();
+    const handleGlobalSearch = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
         setGlobalSearchOpen(true);
       }
     };
-
     document.addEventListener('keydown', handleGlobalSearch);
     return () => document.removeEventListener('keydown', handleGlobalSearch);
   }, []);
-  
+
 
   return (
     <div>
       {routeProjectId && showProjectChat && (
-        <ProjectChat 
-          projectId={parseInt(routeProjectId, 10)} 
+        <ProjectChat
+          projectId={parseInt(routeProjectId, 10)}
           onClose={() => setShowProjectChat(false)}
           models={models}
         />
       )}
-      
+
       {/* Floating chat button for project pages */}
       {routeProjectId && !showProjectChat && (
         <button
@@ -228,7 +199,7 @@ export default function Home(props: HomeProps) {
           </svg>
         </button>
       )}
-      
+
       <div
         className={
           sidebarOpen && !isSmallScreen
@@ -279,9 +250,6 @@ export default function Home(props: HomeProps) {
                     </svg>
                   </button>
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-br from-purple-500 via-violet-500 to-pink-500 flex items-center justify-center shadow-lg transform transition-transform hover:scale-110">
-                      <span className="text-white font-bold text-xs sm:text-sm">M</span>
-                    </div>
                     <span className="font-bold text-sm sm:text-base truncate bg-gradient-to-r from-purple-600 via-violet-600 via-pink-600 to-blue-600 bg-clip-text text-transparent tracking-wider">
                       Meril Chat
                     </span>
@@ -348,7 +316,7 @@ export default function Home(props: HomeProps) {
                           return title.includes(q) || modelId.includes(q) || idStr.includes(q);
                         })
                         .map(c => (
-                        <li
+                          <li
                             key={c.id}
                             className="group flex items-center gap-3 px-3 py-2.5 cursor-pointer relative rounded-xl border transition-all duration-200"
                             onClick={() => openConversation(c.id)}
@@ -367,153 +335,153 @@ export default function Home(props: HomeProps) {
                               e.currentTarget.style.background = c.id === conversationId ? 'linear-gradient(0deg, var(--bg-hover-light), var(--bg-hover-light))' : 'transparent';
                             }}
                           >
-                          {/* Active accent bar */}
-                          <span
-                            className="absolute left-1 top-1/2 -translate-y-1/2 h-6 w-1.5 rounded-full opacity-0 group-hover:opacity-60 transition-opacity"
-                            style={{
-                              background: 'linear-gradient(180deg, var(--accent-primary), var(--accent-hover))',
-                              opacity: c.id === conversationId ? 1 : undefined
-                            }}
-                          />
-                          {/* Icon */}
-                          <div
-                            className="flex-shrink-0 grid place-items-center rounded-md h-7 w-7"
-                            style={{ backgroundColor: 'var(--bg-quaternary)', border: '1px solid var(--border-secondary)', color: 'var(--text-secondary)' }}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M8 12h.01M12 12h.01M16 12h.01" />
-                              <path d="M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                              {c.title || `Chat #${c.id}`}
-                            </div>
-                            <div className="text-[10px] opacity-70 truncate" style={{ color: 'var(--text-tertiary)' }}>
-                              {c.model_id || ''}
-                            </div>
-                          </div>
-                          {/* Three dots icon, only visible on hover */}
-                          <button
-                            type="button"
-                            className="absolute top-2 right-2 p-1 rounded transition-all opacity-0 group-hover:opacity-100"
-                            style={{
-                              color: 'var(--text-tertiary)',
-                              zIndex: 100
-                            }}
-                            title="Options"
-                            data-menu-button
-                            onMouseDown={e => e.stopPropagation()}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
-                              e.currentTarget.style.color = 'var(--text-primary)';
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                              e.currentTarget.style.color = 'var(--text-tertiary)';
-                            }}
-                            onClick={e => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setMenuOpenId(menuOpenId === c.id ? null : c.id);
-                            }}
-                          >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
-                          </button>
-                          {/* Menu: only visible when menuOpenId === c.id */}
-                          {menuOpenId === c.id && (
-                            <div 
-                              className="absolute bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg shadow-lg py-1 min-w-[140px]" 
-                              style={{ 
-                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
-                                zIndex: 9999,
-                                top: '100%',
-                                right: '8px',
-                                marginTop: '4px'
+                            {/* Active accent bar */}
+                            <span
+                              className="absolute left-1 top-1/2 -translate-y-1/2 h-6 w-1.5 rounded-full opacity-0 group-hover:opacity-60 transition-opacity"
+                              style={{
+                                background: 'linear-gradient(180deg, var(--accent-primary), var(--accent-hover))',
+                                opacity: c.id === conversationId ? 1 : undefined
                               }}
-                              data-menu
-                              onClick={e => e.stopPropagation()}
-                              onMouseDown={e => e.stopPropagation()}
+                            />
+                            {/* Icon */}
+                            <div
+                              className="flex-shrink-0 grid place-items-center rounded-md h-7 w-7"
+                              style={{ backgroundColor: 'var(--bg-quaternary)', border: '1px solid var(--border-secondary)', color: 'var(--text-secondary)' }}
                             >
-                              <button
-                                type="button"
-                                className="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 rounded-t-lg"
-                                style={{ color: 'var(--text-primary)' }}
-                                onMouseDown={e => e.stopPropagation()}
-                                onMouseEnter={e => {
-                                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
-                                }}
-                                onMouseLeave={e => {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                }}
-                                onClick={e => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  const title = window.prompt('Rename conversation', c.title || `Chat #${c.id}`);
-                                  if (title !== null) renameConversation(c.id, title);
-                                  setMenuOpenId(null);
-                                }}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                </svg>
-                                Rename
-                              </button>
-                              <button
-                                type="button"
-                                className="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2"
-                                style={{ color: '#ef4444' }}
-                                onMouseDown={e => e.stopPropagation()}
-                                onMouseEnter={e => {
-                                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
-                                }}
-                                onMouseLeave={e => {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                }}
-                                onClick={e => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  if (confirm('Delete this conversation?')) deleteConversation(c.id);
-                                  setMenuOpenId(null);
-                                }}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" />
-                                </svg>
-                                Delete
-                              </button>
-                              <button
-                                type="button"
-                                className="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 rounded-b-lg"
-                                style={{ color: 'var(--text-primary)' }}
-                                onMouseDown={e => e.stopPropagation()}
-                                onMouseEnter={e => {
-                                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
-                                }}
-                                onMouseLeave={e => {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                }}
-                                onClick={e => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setSelectedConvId(c.id);
-                                  setShowProjectModal(true);
-                                  setMenuOpenId(null);
-                                }}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                  <circle cx="9" cy="7" r="4" />
-                                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                                </svg>
-                                Add to Project
-                              </button>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M8 12h.01M12 12h.01M16 12h.01" />
+                                <path d="M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                              </svg>
                             </div>
-                          )}
-                        </li>
-                      ))}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                                {c.title || `Chat #${c.id}`}
+                              </div>
+                              <div className="text-[10px] opacity-70 truncate" style={{ color: 'var(--text-tertiary)' }}>
+                                {c.model_id || ''}
+                              </div>
+                            </div>
+                            {/* Three dots icon, only visible on hover */}
+                            <button
+                              type="button"
+                              className="absolute top-2 right-2 p-1 rounded transition-all opacity-0 group-hover:opacity-100"
+                              style={{
+                                color: 'var(--text-tertiary)',
+                                zIndex: 100
+                              }}
+                              title="Options"
+                              data-menu-button
+                              onMouseDown={e => e.stopPropagation()}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                                e.currentTarget.style.color = 'var(--text-primary)';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                                e.currentTarget.style.color = 'var(--text-tertiary)';
+                              }}
+                              onClick={e => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setMenuOpenId(menuOpenId === c.id ? null : c.id);
+                              }}
+                            >
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+                            </button>
+                            {/* Menu: only visible when menuOpenId === c.id */}
+                            {menuOpenId === c.id && (
+                              <div
+                                className="absolute bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg shadow-lg py-1 min-w-[140px]"
+                                style={{
+                                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+                                  zIndex: 9999,
+                                  top: '100%',
+                                  right: '8px',
+                                  marginTop: '4px'
+                                }}
+                                data-menu
+                                onClick={e => e.stopPropagation()}
+                                onMouseDown={e => e.stopPropagation()}
+                              >
+                                <button
+                                  type="button"
+                                  className="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 rounded-t-lg"
+                                  style={{ color: 'var(--text-primary)' }}
+                                  onMouseDown={e => e.stopPropagation()}
+                                  onMouseEnter={e => {
+                                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                                  }}
+                                  onMouseLeave={e => {
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                  }}
+                                  onClick={e => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const title = window.prompt('Rename conversation', c.title || `Chat #${c.id}`);
+                                    if (title !== null) renameConversation(c.id, title);
+                                    setMenuOpenId(null);
+                                  }}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                  </svg>
+                                  Rename
+                                </button>
+                                <button
+                                  type="button"
+                                  className="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2"
+                                  style={{ color: '#ef4444' }}
+                                  onMouseDown={e => e.stopPropagation()}
+                                  onMouseEnter={e => {
+                                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                                  }}
+                                  onMouseLeave={e => {
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                  }}
+                                  onClick={e => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (confirm('Delete this conversation?')) deleteConversation(c.id);
+                                    setMenuOpenId(null);
+                                  }}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" />
+                                  </svg>
+                                  Delete
+                                </button>
+                                <button
+                                  type="button"
+                                  className="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 rounded-b-lg"
+                                  style={{ color: 'var(--text-primary)' }}
+                                  onMouseDown={e => e.stopPropagation()}
+                                  onMouseEnter={e => {
+                                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                                  }}
+                                  onMouseLeave={e => {
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                  }}
+                                  onClick={e => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setSelectedConvId(c.id);
+                                    setShowProjectModal(true);
+                                    setMenuOpenId(null);
+                                  }}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                    <circle cx="9" cy="7" r="4" />
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                  </svg>
+                                  Add to Project
+                                </button>
+                              </div>
+                            )}
+                          </li>
+                        ))}
                       {conversationSearch.trim() && conversations.filter(c => {
                         const q = conversationSearch.trim().toLowerCase();
                         const title = (c.title || `Chat #${c.id}`).toLowerCase();
@@ -521,10 +489,10 @@ export default function Home(props: HomeProps) {
                         const idStr = String(c.id);
                         return title.includes(q) || modelId.includes(q) || idStr.includes(q);
                       }).length === 0 && (
-                        <li className="px-3 py-2.5 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                          No conversations match "{conversationSearch}"
-                        </li>
-                      )}
+                          <li className="px-3 py-2.5 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                            No conversations match "{conversationSearch}"
+                          </li>
+                        )}
                       {/* Modal for project selection */}
                       {showProjectModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -569,22 +537,22 @@ export default function Home(props: HomeProps) {
                                       if (!selectedConvId || !selectedProjectId) {
                                         throw new Error('No conversation or project selected');
                                       }
-                                      
+
                                       const result = await ProjectsAPI.addConversations(
                                         selectedProjectId,
                                         [selectedConvId]
                                       );
-                                      
+
                                       // Show success message
                                       const message = (result && result.message) ? result.message : 'Chat added to project successfully!';
                                       setSuccessMessage(message);
                                       setTimeout(() => setSuccessMessage(null), 3000); // Hide after 3 seconds
-                                      
+
                                       setShowProjectModal(false);
                                       setSelectedProjectId(null);
                                       setSelectedConvId(null);
                                       setProjectSearch('');
-                                      
+
                                       // Trigger a refresh of conversations list if user is currently viewing projects
                                       // This helps ensure the added conversation shows up in the project view
                                       window.dispatchEvent(new CustomEvent('conversationAddedToProject', {
@@ -606,7 +574,7 @@ export default function Home(props: HomeProps) {
                     </ul>
                   )}
                 </div>
-{/* Login/User Button at bottom */}
+                {/* Login/User Button at bottom */}
                 {!user ? (
                   <div className="flex items-center gap-2 mt-2">
                     <button
@@ -620,7 +588,7 @@ export default function Home(props: HomeProps) {
                       onClick={() => navigate('/register')}
                       className="flex items-center gap-2 text-[var(--text-secondary)] px-2 sm:px-4 py-2 mb-0 font-medium text-sm sm:text-base hover:bg-[var(--bg-hover)] rounded-md transition-colors"
                     >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
                       <span className="hidden sm:inline">Sign up</span>
                     </button>
                   </div>
@@ -628,8 +596,8 @@ export default function Home(props: HomeProps) {
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2 text-[var(--text-secondary)] px-2 sm:px-4 py-2 font-medium text-sm sm:text-base">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                        <circle cx="12" cy="7" r="4"/>
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
                       </svg>
                       <span className="hidden sm:inline truncate">{user.email}</span>
                     </div>
@@ -662,7 +630,7 @@ export default function Home(props: HomeProps) {
         {/* Sidebar Toggle Button (when closed) - Desktop only */}
         {!sidebarOpen && !isSmallScreen && (
           <button
-            className="absolute top-4 left-4 z-50 p-2 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow hover:bg-[var(--bg-hover)] transition-colors"
+            className="absolute top-2 left-4 z-50 p-2 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow hover:bg-[var(--bg-hover)] transition-colors"
             onClick={() => setSidebarOpen(true)}
             aria-label="Open sidebar"
             title="Open sidebar"
@@ -685,14 +653,13 @@ export default function Home(props: HomeProps) {
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" ><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></svg>
                 </button>
               )}
-              
+
               {/* Meril Chat Branding - Only show when sidebar is closed with proper spacing */}
               {!sidebarOpen && (
-                <div 
-                  className={`cursor-pointer hover:scale-105 transition-all duration-200 min-w-0 ${
-                    !isSmallScreen ? 'ml-16' : '' // Add left margin on desktop to avoid collision with sidebar toggle
-                  }`} 
-                  onClick={() => handleNewChat()} 
+                <div
+                  className={`cursor-pointer hover:scale-105 transition-all duration-200 min-w-0 ${!isSmallScreen ? 'ml-16' : '' // Add left margin on desktop to avoid collision with sidebar toggle
+                    }`}
+                  onClick={() => handleNewChat()}
                   title="Start New Chat"
                 >
                   <span className="font-bold text-base sm:text-lg bg-gradient-to-r from-purple-600 via-violet-600 via-pink-600 to-blue-600 bg-clip-text text-transparent tracking-wider hidden sm:inline truncate">
@@ -705,16 +672,16 @@ export default function Home(props: HomeProps) {
                 </div>
               )}
             </div>
-            
+
             {/* Center - Could add breadcrumbs or status here */}
             <div className="flex items-center">
               {/* This space can be used for breadcrumbs, conversation title, etc. */}
             </div>
-            
+
             <div className="flex items-center gap-1 sm:gap-2">
-              <button 
+              <button
                 onClick={() => navigate('/settings')}
-                className="p-1.5 sm:p-2 rounded-lg transition-colors" 
+                className="p-3.5 sm:p-2 rounded-lg transition-colors"
                 style={{ color: 'var(--text-secondary)' }}
                 onMouseEnter={e => {
                   e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
@@ -727,29 +694,24 @@ export default function Home(props: HomeProps) {
                 title="Settings"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="sm:w-[18px] sm:h-[18px]">
-                  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                  <circle cx="12" cy="12" r="3" />
                 </svg>
               </button>
               <ThemeToggle />
             </div>
           </header>
           {/* Chat Area */}
-          <section className="flex justify-center px-4 sm:px-6 pt-8 sm:pt-14 overflow-y-auto">
-            <div className="relative w-full max-w-[1280px] rounded-[16px] sm:rounded-[22px]" style={{
-              border: '1px solid var(--border-secondary)',
-              backgroundColor: theme === 'dark' ? 'rgba(26, 21, 32, 0.4)' : 'rgba(248, 249, 250, 0.8)',
-              boxShadow: 'var(--shadow-secondary)'
-            }}>
-              <div className="pointer-events-none absolute inset-0 rounded-[16px] sm:rounded-[22px] bg-[radial-gradient(1200px_400px_at_50%_-200px,rgba(255,255,255,0.05),rgba(0,0,0,0))]" />
-              <div className="relative flex w-full flex-col gap-4 sm:gap-6 px-4 sm:px-6 lg:px-10 py-6 sm:py-10">
+          <section className="flex flex-col h-full overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6">
+              <div className="mx-auto w-full max-w-[980px]">
                 {items.length === 0 ? (
                   <div className="flex flex-col items-center gap-4 sm:gap-6">
                     <h1 className="m-0 text-2xl sm:text-3xl lg:text-[44px] font-extrabold text-center leading-tight px-2">
                       How can I help you?
                     </h1>
                     <div className="flex flex-wrap justify-center gap-2">
-{SUGGESTIONS.map((s) => (
+                      {SUGGESTIONS.map((s) => (
                         <button
                           key={s.label}
                           className="inline-flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-xs sm:text-sm transition-colors"
@@ -780,7 +742,7 @@ export default function Home(props: HomeProps) {
                             color: 'var(--text-quaternary)',
                             borderBottom: idx < EXAMPLE_PROMPTS.length - 1 ? '1px solid var(--border-tertiary)' : 'none'
                           }}
-onClick={() => { if (!user && publicMode) { navigate('/login'); } else { useExample(prompt); } }}
+                          onClick={() => { if (!user && publicMode) { navigate('/login'); } else { useExample(prompt); } }}
                           onMouseEnter={e => {
                             e.currentTarget.style.color = 'var(--text-primary)';
                           }}
@@ -794,252 +756,280 @@ onClick={() => { if (!user && publicMode) { navigate('/login'); } else { useExam
                     </ul>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-6">
                     {items.map((it) => (
-                        <div key={it.id} className={`group relative max-w-[85%] flex ${it.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className="relative">
-                        <div
-                          className={`rounded-2xl px-4 py-3 text-[15px]`}
-                          style={{
-                            backgroundColor: it.role === 'user' 
-                              ? theme === 'dark' ? 'var(--bg-quaternary)' : '#fee2e2'
-                              : theme === 'dark' ? 'var(--bg-tertiary)' : '#dbeafe',
-                            border: `1px solid ${it.role === 'user' 
-                              ? theme === 'dark' ? 'var(--border-secondary)' : '#fecaca'
-                              : theme === 'dark' ? 'var(--border-secondary)' : '#bfdbfe'}`,
-                            color: 'var(--text-primary)'
-                          }}
-                        >
-                          {editingActive && !justSent && editing && typeof it.apiId === 'number' && editing.id === it.apiId && it.role === 'user' ? (
-                            <div>
-                              <textarea
-                                value={editing?.value ?? ''}
-                                onChange={(e) => setEditing(prev => (prev ? { id: prev.id, value: e.target.value } : prev))}
-                                onKeyDown={async (e) => {
-                                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                                    e.preventDefault();
-                                    if (it.apiId) {
-                                      await editAndContinue(it.apiId, editing?.value ?? it.content);
-                                      setEditing(null);
-                                      setEditingActive(false);
-                                    }
-                                  } else if (e.key === 'Escape') {
-                                    e.preventDefault();
-                                    setEditing(null);
-                                    setEditingActive(false);
-                                  }
-                                }}
-                                rows={3}
-                                className="w-full bg-transparent outline-none resize-vertical"
-                                style={{ color: 'inherit' }}
-                                placeholder="Edit message..."
-                              />
-                              <div className={`mt-2 flex gap-2 ${it.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <button
-                                  className="px-2 py-1 rounded text-xs"
-                                  style={{ border: '1px solid var(--border-secondary)', background: 'var(--bg-quaternary)', color: 'var(--text-primary)' }}
-                                  onClick={async () => {
-                                    if (it.apiId) {
-                                      await editAndContinue(it.apiId, editing?.value ?? it.content);
+                      <div key={it.id} className={`flex ${it.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`group relative ${it.role === 'user' ? 'max-w-[75%]' : 'max-w-full'}`}>
+                          <div
+                            className={`rounded-2xl text-[15px] leading-relaxed ${it.content ? 'px-4 py-3' : ''}`}
+                            style={{
+                              backgroundColor: it.role === 'user'
+                                ? 'var(--accent-primary)'
+                                : theme === 'dark' ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 0.9)',
+                              border: it.role === 'user' ? 'none' : `1px solid ${theme === 'dark' ? 'rgba(75, 85, 99, 0.3)' : 'rgba(229, 231, 235, 0.8)'}`,
+                              color: it.role === 'user' ? 'white' : 'var(--text-primary)',
+                              backdropFilter: 'blur(10px)'
+                            }}
+                          >
+                            {editingActive && !justSent && editing && typeof it.apiId === 'number' && editing.id === it.apiId && it.role === 'user' ? (
+                              <div>
+                                <textarea
+                                  value={editing?.value ?? ''}
+                                  onChange={(e) => setEditing(prev => (prev ? { id: prev.id, value: e.target.value } : prev))}
+                                  onKeyDown={async (e) => {
+                                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                                      e.preventDefault();
+                                      if (it.apiId) {
+                                        await editAndContinue(it.apiId, editing?.value ?? it.content);
+                                        setEditing(null);
+                                        setEditingActive(false);
+                                      }
+                                    } else if (e.key === 'Escape') {
+                                      e.preventDefault();
                                       setEditing(null);
                                       setEditingActive(false);
                                     }
                                   }}
-                                >
-                                  Save (Ctrl/Cmd+Enter)
-                                </button>
-                                <button
-                                  className="px-2 py-1 rounded text-xs"
-                                  style={{ border: '1px solid var(--border-secondary)', background: 'var(--bg-quaternary)', color: 'var(--text-primary)' }}
-                                  onClick={() => { setEditing(null); setEditingActive(false); }}
-                                >
-                                  Cancel (Esc)
-                                </button>
+                                  rows={3}
+                                  className="w-full bg-transparent outline-none resize-vertical"
+                                  style={{ color: 'inherit' }}
+                                  placeholder="Edit message..."
+                                />
+                                <div className={`mt-2 flex gap-2 ${it.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                  <button
+                                    className="px-2 py-1 rounded text-xs"
+                                    style={{ border: '1px solid var(--border-secondary)', background: 'var(--bg-quaternary)', color: 'var(--text-primary)' }}
+                                    onClick={async () => {
+                                      if (it.apiId) {
+                                        await editAndContinue(it.apiId, editing?.value ?? it.content);
+                                        setEditing(null);
+                                        setEditingActive(false);
+                                      }
+                                    }}
+                                  >
+                                    Save (Ctrl/Cmd+Enter)
+                                  </button>
+                                  <button
+                                    className="px-2 py-1 rounded text-xs"
+                                    style={{ border: '1px solid var(--border-secondary)', background: 'var(--bg-quaternary)', color: 'var(--text-primary)' }}
+                                    onClick={() => { setEditing(null); setEditingActive(false); }}
+                                  >
+                                    Cancel (Esc)
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          ) : (
-                            <div>
-                              <Markdown>{it.content}</Markdown>
-                              
-                              {/* Search Results Display */}
-                              {it.isSearchResult && it.searchResults && (
-                                <div className="mt-4 space-y-3">
-                                  {it.searchResults.map((result, idx) => (
-                                    <div 
-                                      key={`${result.id}-${idx}`} 
-                                      className="p-3 rounded-lg border cursor-pointer transition-colors"
-                                      style={{
-                                        backgroundColor: 'var(--bg-tertiary)',
-                                        borderColor: 'var(--border-secondary)'
-                                      }}
-                                      onMouseEnter={e => {
-                                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
-                                      }}
-                                      onMouseLeave={e => {
-                                        e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
-                                      }}
-                                      onClick={() => {
-                                        if (result.type === 'conversation' && result.conversation_id) {
-                                          openConversation(result.conversation_id);
-                                        } else if (result.type === 'message' && result.conversation_id) {
-                                          openConversation(result.conversation_id);
-                                        } else if (result.type === 'web' && result.url) {
-                                          window.open(result.url, '_blank');
-                                        }
-                                      }}
-                                    >
-                                      <div className="flex items-start gap-3">
-                                        <div className="flex-shrink-0 mt-1" style={{ color: 'var(--text-tertiary)' }}>
-                                          {result.type === 'conversation' ? (
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                              <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                            </svg>
-                                          ) : result.type === 'message' ? (
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                              <path d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 4z" />
-                                            </svg>
-                                          ) : (
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                              <circle cx="12" cy="12" r="10" />
-                                              <line x1="2" y1="12" x2="22" y2="12" />
-                                              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                                            </svg>
-                                          )}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <div className="flex items-center gap-2 mb-1">
-                                            <h4 className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>
-                                              {result.title}
-                                            </h4>
-                                            <span className="px-2 py-0.5 rounded-full text-xs flex-shrink-0" style={{
-                                              backgroundColor: result.type === 'web' ? 'rgba(59, 130, 246, 0.1)' : 
-                                                             result.type === 'conversation' ? 'rgba(16, 185, 129, 0.1)' : 
-                                                             'rgba(245, 158, 11, 0.1)',
-                                              color: result.type === 'web' ? '#3b82f6' : 
-                                                     result.type === 'conversation' ? '#10b981' : 
-                                                     '#f59e0b'
-                                            }}>
-                                              {result.type}
-                                            </span>
+                            ) : (
+                              <div>
+                                <Markdown>{it.content}</Markdown>
+
+                                {/* Search Results Display */}
+                                {it.isSearchResult && it.searchResults && (
+                                  <div className="mt-4 space-y-3">
+                                    {it.searchResults.map((result, idx) => (
+                                      <div
+                                        key={`${result.id}-${idx}`}
+                                        className="p-3 rounded-lg border cursor-pointer transition-colors"
+                                        style={{
+                                          backgroundColor: 'var(--bg-tertiary)',
+                                          borderColor: 'var(--border-secondary)'
+                                        }}
+                                        onMouseEnter={e => {
+                                          e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                                        }}
+                                        onMouseLeave={e => {
+                                          e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
+                                        }}
+                                        onClick={() => {
+                                          if (result.type === 'conversation' && result.conversation_id) {
+                                            openConversation(result.conversation_id);
+                                          } else if (result.type === 'message' && result.conversation_id) {
+                                            openConversation(result.conversation_id);
+                                          } else if (result.type === 'web' && result.url) {
+                                            window.open(result.url, '_blank');
+                                          }
+                                        }}
+                                      >
+                                        <div className="flex items-start gap-3">
+                                          <div className="flex-shrink-0 mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                                            {result.type === 'conversation' ? (
+                                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                              </svg>
+                                            ) : result.type === 'message' ? (
+                                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 4z" />
+                                              </svg>
+                                            ) : (
+                                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <circle cx="12" cy="12" r="10" />
+                                                <line x1="2" y1="12" x2="22" y2="12" />
+                                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                              </svg>
+                                            )}
                                           </div>
-                                          <p className="text-sm line-clamp-2 mb-2" style={{ color: 'var(--text-secondary)' }}>
-                                            {result.snippet}
-                                          </p>
-                                          <div className="flex items-center justify-between text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                                            <span>
-                                              {result.url ? (
-                                                new URL(result.url).hostname
-                                              ) : result.created_at ? (
-                                                new Date(result.created_at).toLocaleDateString(undefined, {
-                                                  month: 'short',
-                                                  day: 'numeric',
-                                                  year: 'numeric'
-                                                })
-                                              ) : ''}
-                                            </span>
-                                            <span>Click to open</span>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <h4 className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+                                                {result.title}
+                                              </h4>
+                                              <span className="px-2 py-0.5 rounded-full text-xs flex-shrink-0" style={{
+                                                backgroundColor: result.type === 'web' ? 'rgba(59, 130, 246, 0.1)' :
+                                                  result.type === 'conversation' ? 'rgba(16, 185, 129, 0.1)' :
+                                                    'rgba(245, 158, 11, 0.1)',
+                                                color: result.type === 'web' ? '#3b82f6' :
+                                                  result.type === 'conversation' ? '#10b981' :
+                                                    '#f59e0b'
+                                              }}>
+                                                {result.type}
+                                              </span>
+                                            </div>
+                                            <p className="text-sm line-clamp-2 mb-2" style={{ color: 'var(--text-secondary)' }}>
+                                              {result.snippet}
+                                            </p>
+                                            <div className="flex items-center justify-between text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                                              <span>
+                                                {result.url ? (
+                                                  new URL(result.url).hostname
+                                                ) : result.created_at ? (
+                                                  new Date(result.created_at).toLocaleDateString(undefined, {
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                    year: 'numeric'
+                                                  })
+                                                ) : ''}
+                                              </span>
+                                              <span>Click to open</span>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              
-                              {it.webSearchUsed && (
-                                <div className="mt-2 flex items-center gap-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <line x1="2" y1="12" x2="22" y2="12" />
-                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                                  </svg>
-                                  <span>Enhanced with web search{it.searchQuery ? `: "${it.searchQuery}"` : ''}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        {it.apiId && it.role === 'user' && !justSent && (
-                          <button
-                            type="button"
-                            tabIndex={-1}
-                            onMouseDown={(e) => e.preventDefault()}
-                            className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 transition"
-                            style={{ color: 'var(--text-tertiary)' }}
-                            title="Edit & Continue"
-                            onClick={() => { setEditing({ id: it.apiId!, value: it.content }); setEditingActive(true); }}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-                          </button>
-                        )}
-                        {it.role === 'assistant' && !justSent && (
-                          <div className="absolute top-1 left-1 flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                            {/* Copy Button */}
+                                    ))}
+                                  </div>
+                                )}
+
+                                {it.webSearchUsed && (
+                                  <div className="mt-2 flex items-center gap-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <circle cx="12" cy="12" r="10" />
+                                      <line x1="2" y1="12" x2="22" y2="12" />
+                                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                    </svg>
+                                    <span>Enhanced with web search{it.searchQuery ? `: "${it.searchQuery}"` : ''}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          {it.apiId && it.role === 'user' && !justSent && (
                             <button
                               type="button"
                               tabIndex={-1}
                               onMouseDown={(e) => e.preventDefault()}
-                              className="p-1 rounded transition-colors"
-                              style={{ 
-                                color: copiedMessageId === it.id ? '#22c55e' : 'var(--text-tertiary)',
-                                backgroundColor: copiedMessageId === it.id ? '#22c55e20' : 'transparent'
-                              }}
-                              title={copiedMessageId === it.id ? 'Copied!' : 'Copy message'}
-                              onClick={() => handleCopyMessage(it.content, it.id)}
+                              className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 transition-all"
+                              style={{ color: 'rgba(255, 255, 255, 0.7)', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}
+                              title="Edit & Continue"
+                              onClick={() => { setEditing({ id: it.apiId!, value: it.content }); setEditingActive(true); }}
                               onMouseEnter={e => {
-                                if (copiedMessageId !== it.id) {
-                                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
-                                  e.currentTarget.style.color = 'var(--text-primary)';
-                                }
+                                e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.3)';
+                                e.currentTarget.style.color = 'white';
                               }}
                               onMouseLeave={e => {
-                                if (copiedMessageId !== it.id) {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                  e.currentTarget.style.color = 'var(--text-tertiary)';
-                                }
+                                e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
+                                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
                               }}
                             >
-                              {copiedMessageId === it.id ? (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M20 6L9 17l-5-5"/>
-                                </svg>
-                              ) : (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                </svg>
-                              )}
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></svg>
                             </button>
-                            {/* Regenerate Button */}
-                            {it.apiId && (
+                          )}
+                          {it.role === 'assistant' && !justSent && !isStreaming && (
+                            <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                              {/* Copy Button */}
                               <button
                                 type="button"
                                 tabIndex={-1}
                                 onMouseDown={(e) => e.preventDefault()}
-                                className="p-1 rounded transition-colors"
-                                style={{ color: 'var(--text-tertiary)' }}
-                                title="Regenerate"
-                                onClick={() => regenerateMessage(it.apiId!)}
+                                className="p-1 rounded transition-all"
+                                style={{
+                                  color: copiedMessageId === it.id ? '#22c55e' : 'var(--text-secondary)',
+                                  backgroundColor: copiedMessageId === it.id ? 'rgba(34, 197, 94, 0.15)' : theme === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.5)'
+                                }}
+                                title={copiedMessageId === it.id ? 'Copied!' : 'Copy message'}
+                                onClick={() => handleCopyMessage(it.content, it.id)}
                                 onMouseEnter={e => {
-                                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
-                                  e.currentTarget.style.color = 'var(--text-primary)';
+                                  if (copiedMessageId !== it.id) {
+                                    e.currentTarget.style.backgroundColor = theme === 'dark' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.8)';
+                                    e.currentTarget.style.color = 'var(--text-primary)';
+                                  }
                                 }}
                                 onMouseLeave={e => {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                  e.currentTarget.style.color = 'var(--text-tertiary)';
+                                  if (copiedMessageId !== it.id) {
+                                    e.currentTarget.style.backgroundColor = theme === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.5)';
+                                    e.currentTarget.style.color = 'var(--text-secondary)';
+                                  }
                                 }}
                               >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M21 12a9 9 0 1 1-3-6.7"/>
-                                  <polyline points="21 3 21 9 15 9"/>
-                                </svg>
+                                {copiedMessageId === it.id ? (
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M20 6L9 17l-5-5" />
+                                  </svg>
+                                ) : (
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                                  </svg>
+                                )}
                               </button>
-                            )}
-                          </div>
-                        )}
+                              {/* Regenerate Button */}
+                              {it.apiId && (
+                                <button
+                                  type="button"
+                                  tabIndex={-1}
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  className="p-1 rounded transition-all"
+                                  style={{
+                                    color: 'var(--text-secondary)',
+                                    backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.5)'
+                                  }}
+                                  title="Regenerate"
+                                  onClick={() => regenerateMessage(it.apiId!)}
+                                  onMouseEnter={e => {
+                                    e.currentTarget.style.backgroundColor = theme === 'dark' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.8)';
+                                    e.currentTarget.style.color = 'var(--text-primary)';
+                                  }}
+                                  onMouseLeave={e => {
+                                    e.currentTarget.style.backgroundColor = theme === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.5)';
+                                    e.currentTarget.style.color = 'var(--text-secondary)';
+                                  }}
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M21 12a9 9 0 1 1-3-6.7" />
+                                    <polyline points="21 3 21 9 15 9" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
+                    {/* Streaming Indicator */}
+                    {isStreaming && (
+                      <div className="flex justify-start">
+                        <div className="rounded-2xl px-4 py-3"
+                          style={{
+                            backgroundColor: theme === 'dark' ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 0.9)',
+                            border: `1px solid ${theme === 'dark' ? 'rgba(75, 85, 99, 0.3)' : 'rgba(229, 231, 235, 0.8)'}`,
+                            backdropFilter: 'blur(10px)'
+                          }}
+                        >
+                          <div className="flex gap-1.5 items-center">
+                            <span className="w-2 h-2 bg-[var(--accent-primary)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                            <span className="w-2 h-2 bg-[var(--accent-primary)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                            <span className="w-2 h-2 bg-[var(--accent-primary)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <div ref={chatEndRef} />
                   </div>
                 )}
@@ -1052,7 +1042,7 @@ onClick={() => { if (!user && publicMode) { navigate('/login'); } else { useExam
               {/* Terms banner commented out */}
             </div>
             <div className="mx-auto w-full max-w-[1280px]">
-              <div className="relative flex flex-col rounded-xl sm:rounded-2xl p-2 sm:p-3" style={{
+              <div className="relative flex flex-col rounded-xl sm:rounded-2xl p-3 sm:p-4" style={{
                 border: `1px solid ${searchMode ? 'var(--accent-primary)' : 'var(--border-secondary)'}`,
                 backgroundColor: 'var(--bg-secondary)',
                 boxShadow: searchMode ? '0 0 0 3px rgba(59, 130, 246, 0.1)' : 'var(--shadow-tertiary)'
@@ -1065,7 +1055,7 @@ onClick={() => { if (!user && publicMode) { navigate('/login'); } else { useExam
                       <path d="m21 21-4.35-4.35" />
                     </svg>
                     <span className="text-xs font-medium">Search Mode Active - Press Enter to search</span>
-                    <button 
+                    <button
                       onClick={() => setSearchMode(false)}
                       className="ml-auto p-1 rounded hover:bg-[rgba(59, 130, 246, 0.2)] transition-colors"
                       title="Exit search mode"
@@ -1076,15 +1066,15 @@ onClick={() => { if (!user && publicMode) { navigate('/login'); } else { useExam
                     </button>
                   </div>
                 )}
-<form
-                  onSubmit={(e) => { e.preventDefault(); (document.activeElement as HTMLElement | null)?.blur?.(); setEditing(null); setEditingActive(false); setJustSent(true); setTimeout(() => setJustSent(false), 600); if (!user && publicMode) { navigate('/login'); return; } if (attachedFile) { const hint = `\n\n[Attachment: ${attachedFile.name} (${Math.ceil(attachedFile.size/1024)} KB)]`; setMessage(message + hint); setAttachedFile(null); } handleSend(searchMode); }}
+                <form
+                  onSubmit={(e) => { e.preventDefault(); (document.activeElement as HTMLElement | null)?.blur?.(); setEditing(null); setEditingActive(false); setJustSent(true); setTimeout(() => setJustSent(false), 600); if (!user && publicMode) { navigate('/login'); return; } if (attachedFile) { const hint = `\n\n[Attachment: ${attachedFile.name} (${Math.ceil(attachedFile.size / 1024)} KB)]`; setMessage(message + hint); setAttachedFile(null); } handleSend(searchMode); }}
                   className="flex flex-col"
                 >
                   <input
                     className="flex flex-1 bg-transparent px-2 sm:px-3 pt-2.5 pb-16 sm:pb-20 outline-none text-sm sm:text-[15px]"
                     style={{ color: 'var(--text-primary)', '--placeholder-color': 'var(--text-tertiary)' } as React.CSSProperties & { '--placeholder-color': string }}
                     placeholder={searchMode ? "Search conversations and web..." : "Type your message here..."}
-value={message}
+                    value={message}
                     onChange={e => { if (!user && publicMode) { navigate('/login'); return; } if (editing) { setEditing(null); setEditingActive(false); } setMessage(e.target.value) }}
                     onKeyDown={(e) => {
                       if (!user && publicMode) { e.preventDefault(); navigate('/login'); return; }
@@ -1102,7 +1092,7 @@ value={message}
                     <div className="flex items-center gap-2 px-2 sm:px-3 py-1 text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
                       <span className="truncate max-w-[60%]">{attachedFile.name}</span>
-                      <span>({Math.ceil(attachedFile.size/1024)} KB)</span>
+                      <span>({Math.ceil(attachedFile.size / 1024)} KB)</span>
                       <button type="button" className="ml-auto p-1 rounded hover:bg-[var(--bg-hover)]" title="Remove attachment" onClick={() => setAttachedFile(null)}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
                       </button>
@@ -1115,10 +1105,10 @@ value={message}
                         selectedModelId={selectedModel ?? undefined}
                         onModelChange={(id) => setSelectedModel(id)}
                       />
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={() => setSearchMode(!searchMode)}
-                        className="flex items-center gap-1 sm:gap-2 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm transition-colors" 
+                        className="flex items-center gap-0 sm:gap-2 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm transition-colors"
                         style={{
                           border: `1px solid ${searchMode ? 'var(--accent-primary)' : 'var(--border-secondary)'}`,
                           backgroundColor: searchMode ? 'var(--accent-primary)' : 'var(--bg-quaternary)',
@@ -1130,16 +1120,16 @@ value={message}
                           <circle cx="11" cy="11" r="8" />
                           <path d="m21 21-4.35-4.35" />
                         </svg>
-                        <span className="hidden sm:inline">{searchMode ? 'Search On' : 'Search'}</span>
+                        <span className="hidden sm:block">{searchMode ? 'Search On' : 'Search'}</span>
                       </button>
                       <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const file = e.target.files?.[0] || null; if (file) { const max = 10 * 1024 * 1024; if (file.size > max) { setSuccessMessage('Error: File is larger than 10MB'); setTimeout(() => setSuccessMessage(null), 3000); e.currentTarget.value = ''; return; } setAttachedFile(file); } }} />
-                      <button type="button" className="p-1.5 sm:p-2 rounded-lg transition-colors" style={{ '--hover-bg': 'var(--bg-hover-light)' } as React.CSSProperties & { '--hover-bg': string }} onClick={() => { if (!user && publicMode) { navigate('/login'); return; } fileInputRef.current?.click(); }} title="Attach a file">
+                      <button type="button" className="p-3.5 sm:p-2 rounded-lg transition-colors" style={{ '--hover-bg': 'var(--bg-hover-light)' } as React.CSSProperties & { '--hover-bg': string }} onClick={() => { if (!user && publicMode) { navigate('/login'); return; } fileInputRef.current?.click(); }} title="Attach a file">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="sm:w-5 sm:h-5">
                           <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                         </svg>
                       </button>
                       <button type="button"
-                        className="p-1.5 sm:p-2 rounded-lg transition-colors"
+                        className="p-3.5 sm:p-2 rounded-lg transition-colors"
                         style={{ '--hover-bg': 'var(--bg-hover-light)' } as React.CSSProperties & { '--hover-bg': string }}
                         onClick={() => navigate('/projectsPage')}
                       >
@@ -1177,46 +1167,46 @@ value={message}
           </footer>
         </main>
       </div>
-      
+
       {/* Global Search Modal */}
       <GlobalSearch
         isOpen={globalSearchOpen}
         onClose={() => setGlobalSearchOpen(false)}
         onSelectResult={handleGlobalSearchResult}
       />
-      
+
       {/* Copy Success Toast */}
       {copiedMessageId && (
         <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg border transition-all duration-300 transform"
-             style={{
-               backgroundColor: 'var(--bg-secondary)',
-               borderColor: '#22c55e',
-               color: 'var(--text-primary)'
-             }}>
+          style={{
+            backgroundColor: 'var(--bg-secondary)',
+            borderColor: '#22c55e',
+            color: 'var(--text-primary)'
+          }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2">
-            <path d="M20 6L9 17l-5-5"/>
+            <path d="M20 6L9 17l-5-5" />
           </svg>
           <span className="text-sm font-medium">Message copied to clipboard!</span>
         </div>
       )}
-      
+
       {/* Success/Error Message Toast */}
       {successMessage && (
         <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg border transition-all duration-300 transform"
-             style={{
-               backgroundColor: 'var(--bg-secondary)',
-               borderColor: successMessage.startsWith('Error:') ? '#ef4444' : '#22c55e',
-               color: 'var(--text-primary)'
-             }}>
+          style={{
+            backgroundColor: 'var(--bg-secondary)',
+            borderColor: successMessage.startsWith('Error:') ? '#ef4444' : '#22c55e',
+            color: 'var(--text-primary)'
+          }}>
           {successMessage.startsWith('Error:') ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="15" y1="9" x2="9" y2="15"/>
-              <line x1="9" y1="9" x2="15" y2="15"/>
+              <circle cx="12" cy="12" r="10" />
+              <line x1="15" y1="9" x2="9" y2="15" />
+              <line x1="9" y1="9" x2="15" y2="15" />
             </svg>
           ) : (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2">
-              <path d="M20 6L9 17l-5-5"/>
+              <path d="M20 6L9 17l-5-5" />
             </svg>
           )}
           <span className="text-sm font-medium">{successMessage}</span>

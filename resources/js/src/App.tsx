@@ -73,6 +73,7 @@ function AppContent() {
   const [selectedModel, setSelectedModel] = useState<string | null>(null)
   const [models, setModels] = useState<ApiModelItem[]>([])
   const [conversations, setConversations] = useState<ApiConversation[]>([])
+  const [isStreaming, setIsStreaming] = useState(false)
 
   // Removed auto-scroll to keep main page from scrolling
 
@@ -161,7 +162,7 @@ function AppContent() {
 
   const handleSend = async (searchMode: boolean = false) => {
     const text = message.trim()
-    if (!text) return
+    if (!text || isStreaming) return
     
     // If user is not authenticated and trying to chat (not search), show login message
     if (!user && !searchMode) {
@@ -179,6 +180,7 @@ function AppContent() {
     const userItem: ChatItem = { id: generateUUID(), role: 'user', content: text }
     setItems(prev => [...prev, userItem])
     setMessage('')
+    setIsStreaming(true)
     
     // If in search mode, fetch top results and feed them into the model
     if (searchMode) {
@@ -256,6 +258,8 @@ function AppContent() {
             try { setConversations(await ConversationsAPI.list()) } catch {}
           } catch (e: any) {
             setItems(prev => prev.map(it => it.id === assistantId ? { ...it, content: `Error contacting server: ${e?.message ?? 'Unknown error'}` } : it))
+          } finally {
+            setIsStreaming(false)
           }
           return
         }
@@ -338,6 +342,8 @@ function AppContent() {
           content: `Error contacting server: ${e?.message ?? 'Unknown error'}`,
         }
         setItems(prev => [...prev, assistantItem])
+      } finally {
+        setIsStreaming(false)
       }
     })()
   }
@@ -376,7 +382,8 @@ function AppContent() {
     models, selectedModel, setSelectedModel,
     conversationId, conversations,
     openConversation, deleteConversation, renameConversation,
-    editMessage, deleteMessage, regenerateMessage, editAndContinue
+    editMessage, deleteMessage, regenerateMessage, editAndContinue,
+    isStreaming
   }
 
   return (
