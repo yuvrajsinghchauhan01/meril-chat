@@ -295,7 +295,7 @@ const CreateProject = () => {
                     <div className="relative">
                         <button
                             onClick={() => toggleMenu('main')}
-                            className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg transition-colors"
+                            // className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg transition-colors"
                             style={{
                                 backgroundColor: 'var(--bg-quaternary)',
                                 border: '1px solid var(--border-secondary)',
@@ -310,7 +310,10 @@ const CreateProject = () => {
                                 e.currentTarget.style.color = 'var(--text-secondary)';
                             }}
                         >
-                            <Icon d="M12 5h.01M12 12h.01M12 19h.01" size={18} fill="currentColor" />
+                            {/* <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3m15.364 6.364l-4.243-4.243m-6.364 0L3.636 17.364m12.728 0l-4.243-4.243m-6.364 0L3.636 6.636" />
+                            </svg> */}
                         </button>
 
                         {menus.main && (
@@ -376,13 +379,13 @@ const CreateProject = () => {
             {/* Main Content */}
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Sidebar - Conversations */}
-                <div className="w-80 border-r p-4 flex flex-col overflow-hidden" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
+                <div className="w-48 sm:w-56 lg:w-80 border-r p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
                     <div className="flex flex-col gap-2 mb-4">
-                        <div className="flex items-center justify-between">
-                            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations</span>
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold text-xs sm:text-sm lg:text-base" style={{ color: 'var(--text-primary)' }}>Chats</span>
                             <button
                                 onClick={handleNewChat}
-                                className="px-3 py-1.5 rounded-lg text-white text-sm flex items-center gap-2 transition-colors"
+                                className="px-2 py-1 lg:px-3 lg:py-1.5 rounded-lg text-white text-xs lg:text-sm flex items-center gap-1 lg:gap-2 transition-colors"
                                 style={{ backgroundColor: 'var(--accent-primary)' }}
                                 onMouseEnter={e => {
                                     e.currentTarget.style.backgroundColor = 'var(--accent-hover)';
@@ -390,14 +393,15 @@ const CreateProject = () => {
                                 onMouseLeave={e => {
                                     e.currentTarget.style.backgroundColor = 'var(--accent-primary)';
                                 }}
+                                title="New Chat"
                             >
-                                <Icon d="M12 4v16m8-8H4" size={16} />
-                                New Chat
+                                <Icon d="M12 4v16m8-8H4" size={14} />
+                                <span className="hidden lg:inline">New</span>
                             </button>
                         </div>
                         <button
                             onClick={handleShareChat}
-                            className="w-full px-3 py-2 rounded-lg border text-sm flex items-center justify-center gap-2 transition-colors"
+                            className="w-full px-2 py-1.5 lg:px-3 lg:py-2 rounded-lg border text-xs lg:text-sm flex items-center justify-center gap-1 lg:gap-2 transition-colors"
                             style={{
                                 borderColor: 'var(--border-secondary)',
                                 backgroundColor: 'var(--bg-quaternary)',
@@ -410,14 +414,15 @@ const CreateProject = () => {
                                 e.currentTarget.style.backgroundColor = 'var(--bg-quaternary)';
                             }}
                         >
-                            <Icon d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" size={16} />
-                            Share Chat from Main
+                            <Icon d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" size={14} />
+                            <span className="hidden lg:inline">Share Chat from Main</span>
+                            <span className="lg:hidden">Share</span>
                         </button>
                     </div>
 
                     {conversations.length === 0 ? (
-                        <div className="text-sm text-center py-4" style={{ color: 'var(--text-tertiary)' }}>
-                            No conversations yet
+                        <div className="text-xs lg:text-sm text-center py-4" style={{ color: 'var(--text-tertiary)' }}>
+                            No chats yet
                         </div>
                     ) : (
                         <div className="flex-1 overflow-auto">
@@ -425,7 +430,7 @@ const CreateProject = () => {
                                 {conversations.map((conv: any) => (
                                     <div key={conv.id} className="group relative">
                                         <button
-                                            className="w-full text-left p-3 rounded-lg transition-colors"
+                                            className="w-full text-left p-2 lg:p-3 rounded-lg transition-colors"
                                             style={{
                                                 backgroundColor: selectedConversationId === conv.id
                                                     ? 'var(--bg-hover-light)'
@@ -445,13 +450,13 @@ const CreateProject = () => {
                                             onClick={() => handleSelectConversation(conv.id)}
                                         >
                                             <div className="flex items-start">
-                                                <Icon d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" size={18} />
-                                                <div className="ml-3 flex-1 min-w-0">
-                                                    <div className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                                                <Icon d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" size={16} />
+                                                <div className="ml-2 lg:ml-3 flex-1 max-w-24">
+                                                    <div className="font-medium truncate text-xs lg:text-sm" style={{ color: 'var(--text-primary)' }}>
                                                         {conv.title || `Chat ${conv.id}`}
                                                     </div>
-                                                    <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                                                        {new Date(conv.updated_at).toLocaleString()}
+                                                    <div className="text-[10px] lg:text-xs hidden sm:block" style={{ color: 'var(--text-tertiary)' }}>
+                                                        {new Date(conv.updated_at).toLocaleDateString()}
                                                     </div>
                                                 </div>
                                             </div>
@@ -513,14 +518,14 @@ const CreateProject = () => {
                 </div>
 
                 {/* Right Panel */}
-                <div className="w-full lg:w-[380px] flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 lg:p-8 lg:border-l border-[var(--border-primary)] lg:border-t-0 border-t overflow-y-auto">
+                <div className="w-48 sm:w-56 lg:w-[380px] flex flex-col gap-3 lg:gap-6 p-2 sm:p-3 lg:p-8 border-l overflow-y-auto" style={{ borderColor: 'var(--border-primary)' }}>
                     {/* Instructions */}
-                    <div className="rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-secondary)] p-4 sm:p-6">
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="font-semibold text-sm sm:text-base" style={{ color: 'var(--text-primary)' }}>Instructions</span>
+                    <div className="rounded-lg lg:rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-secondary)] p-2 sm:p-3 lg:p-6">
+                        <div className="flex items-center justify-between mb-2 lg:mb-3">
+                            <span className="font-semibold text-xs lg:text-base" style={{ color: 'var(--text-primary)' }}>Info</span>
                             <button
                                 onClick={() => toggleMenu('modal')}
-                                className="p-1.5 rounded-md transition-colors"
+                                className="p-1 lg:p-1.5 rounded-md transition-colors"
                                 style={{ '--hover-bg': 'var(--bg-hover)' } as React.CSSProperties & { '--hover-bg': string }}
                                 onMouseEnter={e => {
                                     e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
@@ -528,27 +533,28 @@ const CreateProject = () => {
                                 onMouseLeave={e => {
                                     e.currentTarget.style.backgroundColor = 'transparent';
                                 }}
+                                title="Edit instructions"
                             >
-                                <Icon d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" size={16} />
+                                <Icon d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" size={14} />
                             </button>
                         </div>
-                        <p className="text-sm line-clamp-3" style={{ color: 'var(--text-secondary)' }}>{savedInstructions}</p>
+                        <p className="text-[10px] lg:text-sm line-clamp-2 lg:line-clamp-3" style={{ color: 'var(--text-secondary)' }}>{savedInstructions}</p>
                     </div>
 
                     {/* Files */}
-                    <div className="rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-secondary)] p-4 sm:p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <span className="font-semibold text-sm sm:text-base" style={{ color: 'var(--text-primary)' }}>Files</span>
+                    <div className="rounded-lg lg:rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-secondary)] p-2 sm:p-3 lg:p-6">
+                        <div className="flex items-center justify-between mb-3 lg:mb-4">
+                            <span className="font-semibold text-xs lg:text-base" style={{ color: 'var(--text-primary)' }}>Files</span>
                             <div className="relative">
                                 <button
                                     onClick={() => toggleMenu('file')}
-                                    className="p-1.5 rounded-md transition-colors flex items-center justify-center"
+                                    className="p-1 lg:p-1.5 rounded-md transition-colors flex items-center justify-center"
                                     style={{
                                         '--hover-bg': 'var(--bg-hover)',
                                         backgroundColor: 'var(--bg-quaternary)',
                                         border: '1px solid var(--border-secondary)',
-                                        width: '32px',
-                                        height: '32px'
+                                        width: '24px',
+                                        height: '24px'
                                     } as React.CSSProperties & { '--hover-bg': string }}
                                     onMouseEnter={e => {
                                         e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
@@ -556,8 +562,9 @@ const CreateProject = () => {
                                     onMouseLeave={e => {
                                         e.currentTarget.style.backgroundColor = 'var(--bg-quaternary)';
                                     }}
+                                    title="Add file"
                                 >
-                                    <Icon d="M12 4v16m8-8H4" size={16} />
+                                    <Icon d="M12 4v16m8-8H4" size={14} />
                                 </button>
 
                                 {menus.file && (
@@ -614,28 +621,28 @@ const CreateProject = () => {
                         </div>
 
                         {files.length > 0 ? (
-                            <div className="space-y-2">
+                            <div className="space-y-1 lg:space-y-2">
                                 {files.map(file => (
-                                    <div key={file.id} className="flex items-center justify-between p-3 rounded-lg border transition-colors" style={{
+                                    <div key={file.id} className="flex items-center justify-between p-2 lg:p-3 rounded-lg border transition-colors" style={{
                                         backgroundColor: 'var(--bg-tertiary)',
                                         borderColor: 'var(--border-secondary)'
                                     }}>
-                                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                                            <div className="w-10 h-10 flex items-center justify-center rounded-lg" style={{
+                                        <div className="flex items-center gap-2 lg:gap-3 min-w-0 flex-1">
+                                            <div className="w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center rounded-lg flex-shrink-0" style={{
                                                 backgroundColor: 'var(--bg-quaternary)',
                                                 border: '1px solid var(--border-secondary)',
                                                 color: 'var(--text-secondary)'
                                             }}>
-                                                <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z" size={16} />
+                                                <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z" size={14} />
                                             </div>
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{file.name}</p>
-                                                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{file.type} • {file.size}</p>
+                                            <div className="min-w-0 hidden lg:block">
+                                                <p className="text-xs lg:text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{file.name}</p>
+                                                <p className="text-[10px] lg:text-xs" style={{ color: 'var(--text-secondary)' }}>{file.type} • {file.size}</p>
                                             </div>
                                         </div>
                                         <button
                                             onClick={() => removeFile(file.id)}
-                                            className="p-1.5 rounded-md transition-colors"
+                                            className="p-1 lg:p-1.5 rounded-md transition-colors flex-shrink-0"
                                             style={{ color: 'var(--text-tertiary)' }}
                                             onMouseEnter={e => {
                                                 e.currentTarget.style.color = 'var(--text-primary)';
@@ -645,18 +652,22 @@ const CreateProject = () => {
                                                 e.currentTarget.style.color = 'var(--text-tertiary)';
                                                 e.currentTarget.style.backgroundColor = 'transparent';
                                             }}
+                                            title="Remove file"
                                         >
-                                            <Icon d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={16} />
+                                            <Icon d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={14} />
                                         </button>
                                     </div>
                                 ))}
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
-                                <div className="mb-4" style={{ color: 'var(--text-tertiary)', opacity: 0.6 }}>
+                            <div className="flex flex-col items-center justify-center py-4 lg:py-8 px-2 lg:px-4 text-center">
+                                <div className="mb-2 lg:mb-4 hidden lg:block" style={{ color: 'var(--text-tertiary)', opacity: 0.6 }}>
                                     <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z" size={48} />
                                 </div>
-                                <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Add PDFs, documents, or other text to reference in this project.</span>
+                                <span className="text-[10px] lg:text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                                    <span className="hidden lg:inline">Add PDFs, documents, or other text to reference in this project.</span>
+                                    <span className="lg:hidden">No files</span>
+                                </span>
                             </div>
                         )}
                     </div>
