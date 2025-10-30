@@ -113,7 +113,7 @@ stream.form = streamForm
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::conversations
-* @see app/Http/Controllers/Api/ChatController.php:323
+* @see app/Http/Controllers/Api/ChatController.php:364
 * @route '/api/conversations'
 */
 export const conversations = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -128,7 +128,7 @@ conversations.definition = {
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::conversations
-* @see app/Http/Controllers/Api/ChatController.php:323
+* @see app/Http/Controllers/Api/ChatController.php:364
 * @route '/api/conversations'
 */
 conversations.url = (options?: RouteQueryOptions) => {
@@ -137,7 +137,7 @@ conversations.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::conversations
-* @see app/Http/Controllers/Api/ChatController.php:323
+* @see app/Http/Controllers/Api/ChatController.php:364
 * @route '/api/conversations'
 */
 conversations.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -147,7 +147,7 @@ conversations.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::conversations
-* @see app/Http/Controllers/Api/ChatController.php:323
+* @see app/Http/Controllers/Api/ChatController.php:364
 * @route '/api/conversations'
 */
 conversations.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -157,7 +157,7 @@ conversations.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => (
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::conversations
-* @see app/Http/Controllers/Api/ChatController.php:323
+* @see app/Http/Controllers/Api/ChatController.php:364
 * @route '/api/conversations'
 */
 const conversationsForm = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -167,7 +167,7 @@ const conversationsForm = (options?: RouteQueryOptions): RouteFormDefinition<'ge
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::conversations
-* @see app/Http/Controllers/Api/ChatController.php:323
+* @see app/Http/Controllers/Api/ChatController.php:364
 * @route '/api/conversations'
 */
 conversationsForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -177,7 +177,7 @@ conversationsForm.get = (options?: RouteQueryOptions): RouteFormDefinition<'get'
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::conversations
-* @see app/Http/Controllers/Api/ChatController.php:323
+* @see app/Http/Controllers/Api/ChatController.php:364
 * @route '/api/conversations'
 */
 conversationsForm.head = (options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -194,7 +194,7 @@ conversations.form = conversationsForm
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::show
-* @see app/Http/Controllers/Api/ChatController.php:353
+* @see app/Http/Controllers/Api/ChatController.php:394
 * @route '/api/conversations/{id}'
 */
 export const show = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -209,7 +209,7 @@ show.definition = {
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::show
-* @see app/Http/Controllers/Api/ChatController.php:353
+* @see app/Http/Controllers/Api/ChatController.php:394
 * @route '/api/conversations/{id}'
 */
 show.url = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -236,7 +236,7 @@ show.url = (args: { id: string | number } | [id: string | number ] | string | nu
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::show
-* @see app/Http/Controllers/Api/ChatController.php:353
+* @see app/Http/Controllers/Api/ChatController.php:394
 * @route '/api/conversations/{id}'
 */
 show.get = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -246,7 +246,7 @@ show.get = (args: { id: string | number } | [id: string | number ] | string | nu
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::show
-* @see app/Http/Controllers/Api/ChatController.php:353
+* @see app/Http/Controllers/Api/ChatController.php:394
 * @route '/api/conversations/{id}'
 */
 show.head = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -256,7 +256,7 @@ show.head = (args: { id: string | number } | [id: string | number ] | string | n
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::show
-* @see app/Http/Controllers/Api/ChatController.php:353
+* @see app/Http/Controllers/Api/ChatController.php:394
 * @route '/api/conversations/{id}'
 */
 const showForm = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -266,7 +266,7 @@ const showForm = (args: { id: string | number } | [id: string | number ] | strin
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::show
-* @see app/Http/Controllers/Api/ChatController.php:353
+* @see app/Http/Controllers/Api/ChatController.php:394
 * @route '/api/conversations/{id}'
 */
 showForm.get = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -276,7 +276,7 @@ showForm.get = (args: { id: string | number } | [id: string | number ] | string 
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::show
-* @see app/Http/Controllers/Api/ChatController.php:353
+* @see app/Http/Controllers/Api/ChatController.php:394
 * @route '/api/conversations/{id}'
 */
 showForm.head = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'get'> => ({
@@ -293,7 +293,7 @@ show.form = showForm
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::update
-* @see app/Http/Controllers/Api/ChatController.php:406
+* @see app/Http/Controllers/Api/ChatController.php:447
 * @route '/api/conversations/{id}'
 */
 export const update = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -308,7 +308,7 @@ update.definition = {
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::update
-* @see app/Http/Controllers/Api/ChatController.php:406
+* @see app/Http/Controllers/Api/ChatController.php:447
 * @route '/api/conversations/{id}'
 */
 update.url = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -335,7 +335,7 @@ update.url = (args: { id: string | number } | [id: string | number ] | string | 
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::update
-* @see app/Http/Controllers/Api/ChatController.php:406
+* @see app/Http/Controllers/Api/ChatController.php:447
 * @route '/api/conversations/{id}'
 */
 update.put = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -345,7 +345,7 @@ update.put = (args: { id: string | number } | [id: string | number ] | string | 
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::update
-* @see app/Http/Controllers/Api/ChatController.php:406
+* @see app/Http/Controllers/Api/ChatController.php:447
 * @route '/api/conversations/{id}'
 */
 const updateForm = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -360,7 +360,7 @@ const updateForm = (args: { id: string | number } | [id: string | number ] | str
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::update
-* @see app/Http/Controllers/Api/ChatController.php:406
+* @see app/Http/Controllers/Api/ChatController.php:447
 * @route '/api/conversations/{id}'
 */
 updateForm.put = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -377,7 +377,7 @@ update.form = updateForm
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::destroy
-* @see app/Http/Controllers/Api/ChatController.php:379
+* @see app/Http/Controllers/Api/ChatController.php:420
 * @route '/api/conversations/{id}'
 */
 export const destroy = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -392,7 +392,7 @@ destroy.definition = {
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::destroy
-* @see app/Http/Controllers/Api/ChatController.php:379
+* @see app/Http/Controllers/Api/ChatController.php:420
 * @route '/api/conversations/{id}'
 */
 destroy.url = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -419,7 +419,7 @@ destroy.url = (args: { id: string | number } | [id: string | number ] | string |
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::destroy
-* @see app/Http/Controllers/Api/ChatController.php:379
+* @see app/Http/Controllers/Api/ChatController.php:420
 * @route '/api/conversations/{id}'
 */
 destroy.delete = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -429,7 +429,7 @@ destroy.delete = (args: { id: string | number } | [id: string | number ] | strin
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::destroy
-* @see app/Http/Controllers/Api/ChatController.php:379
+* @see app/Http/Controllers/Api/ChatController.php:420
 * @route '/api/conversations/{id}'
 */
 const destroyForm = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -444,7 +444,7 @@ const destroyForm = (args: { id: string | number } | [id: string | number ] | st
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::destroy
-* @see app/Http/Controllers/Api/ChatController.php:379
+* @see app/Http/Controllers/Api/ChatController.php:420
 * @route '/api/conversations/{id}'
 */
 destroyForm.delete = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -461,7 +461,7 @@ destroy.form = destroyForm
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::editMessage
-* @see app/Http/Controllers/Api/ChatController.php:446
+* @see app/Http/Controllers/Api/ChatController.php:487
 * @route '/api/messages/{id}'
 */
 export const editMessage = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -476,7 +476,7 @@ editMessage.definition = {
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::editMessage
-* @see app/Http/Controllers/Api/ChatController.php:446
+* @see app/Http/Controllers/Api/ChatController.php:487
 * @route '/api/messages/{id}'
 */
 editMessage.url = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -503,7 +503,7 @@ editMessage.url = (args: { id: string | number } | [id: string | number ] | stri
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::editMessage
-* @see app/Http/Controllers/Api/ChatController.php:446
+* @see app/Http/Controllers/Api/ChatController.php:487
 * @route '/api/messages/{id}'
 */
 editMessage.put = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -513,7 +513,7 @@ editMessage.put = (args: { id: string | number } | [id: string | number ] | stri
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::editMessage
-* @see app/Http/Controllers/Api/ChatController.php:446
+* @see app/Http/Controllers/Api/ChatController.php:487
 * @route '/api/messages/{id}'
 */
 const editMessageForm = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -528,7 +528,7 @@ const editMessageForm = (args: { id: string | number } | [id: string | number ] 
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::editMessage
-* @see app/Http/Controllers/Api/ChatController.php:446
+* @see app/Http/Controllers/Api/ChatController.php:487
 * @route '/api/messages/{id}'
 */
 editMessageForm.put = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -545,7 +545,7 @@ editMessage.form = editMessageForm
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::deleteMessage
-* @see app/Http/Controllers/Api/ChatController.php:497
+* @see app/Http/Controllers/Api/ChatController.php:538
 * @route '/api/messages/{id}'
 */
 export const deleteMessage = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -560,7 +560,7 @@ deleteMessage.definition = {
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::deleteMessage
-* @see app/Http/Controllers/Api/ChatController.php:497
+* @see app/Http/Controllers/Api/ChatController.php:538
 * @route '/api/messages/{id}'
 */
 deleteMessage.url = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -587,7 +587,7 @@ deleteMessage.url = (args: { id: string | number } | [id: string | number ] | st
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::deleteMessage
-* @see app/Http/Controllers/Api/ChatController.php:497
+* @see app/Http/Controllers/Api/ChatController.php:538
 * @route '/api/messages/{id}'
 */
 deleteMessage.delete = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -597,7 +597,7 @@ deleteMessage.delete = (args: { id: string | number } | [id: string | number ] |
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::deleteMessage
-* @see app/Http/Controllers/Api/ChatController.php:497
+* @see app/Http/Controllers/Api/ChatController.php:538
 * @route '/api/messages/{id}'
 */
 const deleteMessageForm = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -612,7 +612,7 @@ const deleteMessageForm = (args: { id: string | number } | [id: string | number 
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::deleteMessage
-* @see app/Http/Controllers/Api/ChatController.php:497
+* @see app/Http/Controllers/Api/ChatController.php:538
 * @route '/api/messages/{id}'
 */
 deleteMessageForm.delete = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -629,7 +629,7 @@ deleteMessage.form = deleteMessageForm
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::regenerateMessage
-* @see app/Http/Controllers/Api/ChatController.php:536
+* @see app/Http/Controllers/Api/ChatController.php:577
 * @route '/api/messages/{id}/regenerate'
 */
 export const regenerateMessage = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -644,7 +644,7 @@ regenerateMessage.definition = {
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::regenerateMessage
-* @see app/Http/Controllers/Api/ChatController.php:536
+* @see app/Http/Controllers/Api/ChatController.php:577
 * @route '/api/messages/{id}/regenerate'
 */
 regenerateMessage.url = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -671,7 +671,7 @@ regenerateMessage.url = (args: { id: string | number } | [id: string | number ] 
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::regenerateMessage
-* @see app/Http/Controllers/Api/ChatController.php:536
+* @see app/Http/Controllers/Api/ChatController.php:577
 * @route '/api/messages/{id}/regenerate'
 */
 regenerateMessage.post = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -681,7 +681,7 @@ regenerateMessage.post = (args: { id: string | number } | [id: string | number ]
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::regenerateMessage
-* @see app/Http/Controllers/Api/ChatController.php:536
+* @see app/Http/Controllers/Api/ChatController.php:577
 * @route '/api/messages/{id}/regenerate'
 */
 const regenerateMessageForm = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -691,7 +691,7 @@ const regenerateMessageForm = (args: { id: string | number } | [id: string | num
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::regenerateMessage
-* @see app/Http/Controllers/Api/ChatController.php:536
+* @see app/Http/Controllers/Api/ChatController.php:577
 * @route '/api/messages/{id}/regenerate'
 */
 regenerateMessageForm.post = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -703,7 +703,7 @@ regenerateMessage.form = regenerateMessageForm
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::editAndContinue
-* @see app/Http/Controllers/Api/ChatController.php:636
+* @see app/Http/Controllers/Api/ChatController.php:677
 * @route '/api/messages/{id}/edit-and-continue'
 */
 export const editAndContinue = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -718,7 +718,7 @@ editAndContinue.definition = {
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::editAndContinue
-* @see app/Http/Controllers/Api/ChatController.php:636
+* @see app/Http/Controllers/Api/ChatController.php:677
 * @route '/api/messages/{id}/edit-and-continue'
 */
 editAndContinue.url = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -745,7 +745,7 @@ editAndContinue.url = (args: { id: string | number } | [id: string | number ] | 
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::editAndContinue
-* @see app/Http/Controllers/Api/ChatController.php:636
+* @see app/Http/Controllers/Api/ChatController.php:677
 * @route '/api/messages/{id}/edit-and-continue'
 */
 editAndContinue.post = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -755,7 +755,7 @@ editAndContinue.post = (args: { id: string | number } | [id: string | number ] |
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::editAndContinue
-* @see app/Http/Controllers/Api/ChatController.php:636
+* @see app/Http/Controllers/Api/ChatController.php:677
 * @route '/api/messages/{id}/edit-and-continue'
 */
 const editAndContinueForm = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({
@@ -765,7 +765,7 @@ const editAndContinueForm = (args: { id: string | number } | [id: string | numbe
 
 /**
 * @see \App\Http\Controllers\Api\ChatController::editAndContinue
-* @see app/Http/Controllers/Api/ChatController.php:636
+* @see app/Http/Controllers/Api/ChatController.php:677
 * @route '/api/messages/{id}/edit-and-continue'
 */
 editAndContinueForm.post = (args: { id: string | number } | [id: string | number ] | string | number, options?: RouteQueryOptions): RouteFormDefinition<'post'> => ({

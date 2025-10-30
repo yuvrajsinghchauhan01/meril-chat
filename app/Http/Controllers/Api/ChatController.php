@@ -232,52 +232,94 @@ class ChatController extends Controller
             $siteName = config('services.openrouter.site_name', config('app.name'));
             $baseUrl = 'https://openrouter.ai/api/v1';
 
-            // Return streaming response using Http client
+            // Return streaming response using a cURL streaming loop so we can forward chunks immediately
             return response()->stream(function () use ($payload, $conversationId, $apiKey, $siteUrl, $siteName, $baseUrl, $request) {
                 $fullContent = '';
-                
-                try {
-                    $response = Http::withHeaders([
-                        'Authorization' => 'Bearer ' . $apiKey,
-                        'HTTP-Referer' => $siteUrl,
-                        'X-Title' => $siteName,
-                        'Content-Type' => 'application/json',
-                    ])->timeout(120)->withOptions([
-                        'stream' => true,
-                    ])->post($baseUrl . '/chat/completions', $payload);
 
-                    // Process the stream
-                    $body = $response->toPsrResponse()->getBody();
-                    
-                    while (!$body->eof()) {
-                        $chunk = $body->read(8192);
-                        echo $chunk;
-                        
-                        // Parse the SSE data to accumulate content
-                        $lines = explode("\n", $chunk);
+                // Prepare cURL for streaming
+                $ch = curl_init($baseUrl . '/chat/completions');
+                $jsonPayload = json_encode($payload);
+
+                $headers = [
+                    'Authorization: Bearer ' . $apiKey,
+                    'HTTP-Referer: ' . $siteUrl,
+                    'X-Title: ' . $siteName,
+                    'Content-Type: application/json',
+                    'Accept: text/event-stream',
+                ];
+
+                // buffer for assembling SSE blocks
+                $sseBuffer = '';
+
+                $writeFn = function ($curl, $data) use (&$sseBuffer, &$fullContent) {
+                    // Immediately forward raw data to the client
+                    echo $data;
+
+                    // Append to sse buffer and try to process complete SSE blocks separated by double-newline
+                    $sseBuffer .= $data;
+                    while (($pos = strpos($sseBuffer, "\n\n")) !== false) {
+                        $block = substr($sseBuffer, 0, $pos);
+                        $sseBuffer = substr($sseBuffer, $pos + 2);
+
+                        // Each block may contain lines like "data: {...}". Parse those lines.
+                        $lines = explode("\n", $block);
                         foreach ($lines as $line) {
-                            if (str_starts_with($line, 'data: ')) {
-                                $jsonData = trim(substr($line, 6));
-                                if ($jsonData !== '[DONE]' && !empty($jsonData)) {
-                                    try {
-                                        $decoded = json_decode($jsonData, true);
-                                        if (isset($decoded['choices'][0]['delta']['content'])) {
-                                            $fullContent .= $decoded['choices'][0]['delta']['content'];
-                                        }
-                                    } catch (\Exception $e) {
-                                        // Ignore JSON parse errors
+                            $line = trim($line);
+                            if ($line === '') continue;
+                            if (str_starts_with($line, 'data:')) {
+                                $dataStr = trim(substr($line, 5));
+                                if ($dataStr === '[DONE]') {
+                                    // end of stream marker
+                                    continue;
+                                }
+                                if ($dataStr === '') continue;
+                                // Try parse JSON and accumulate content tokens
+                                $decoded = json_decode($dataStr, true);
+                                if (is_array($decoded)) {
+                                    // delta.content (stream) or message.content (single final)
+                                    if (isset($decoded['choices'][0]['delta']['content'])) {
+                                        $fullContent .= $decoded['choices'][0]['delta']['content'];
+                                    } elseif (isset($decoded['choices'][0]['message']['content'])) {
+                                        $fullContent .= $decoded['choices'][0]['message']['content'];
                                     }
                                 }
                             }
                         }
-                        
-                        if (ob_get_level() > 0) {
-                            ob_flush();
-                        }
-                        flush();
                     }
 
-                    // After streaming is complete, save the assistant message
+                    if (ob_get_level() > 0) {
+                        @ob_flush();
+                    }
+                    @flush();
+
+                    return strlen($data);
+                };
+
+                curl_setopt_array($ch, [
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => $jsonPayload,
+                    CURLOPT_HTTPHEADER => $headers,
+                    CURLOPT_RETURNTRANSFER => false,
+                    CURLOPT_WRITEFUNCTION => $writeFn,
+                    CURLOPT_TIMEOUT => 0,
+                    CURLOPT_CONNECTTIMEOUT => 10,
+                ]);
+
+                // Execute cURL (this will invoke the write function as chunks arrive)
+                try {
+                    curl_exec($ch);
+                    $err = curl_error($ch);
+                    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                } catch (\Exception $e) {
+                    \Log::error('cURL stream error: ' . $e->getMessage());
+                }
+
+                if (is_resource($ch)) {
+                    curl_close($ch);
+                }
+
+                // After streaming is complete, persist the assistant message if we accumulated content
+                try {
                     if (!empty($fullContent)) {
                         Message::create([
                             'conversation_id' => $conversationId,
@@ -295,10 +337,9 @@ class ChatController extends Controller
                         ]);
                     }
                 } catch (\Exception $e) {
-                    \Log::error('Stream processing error: ' . $e->getMessage());
-                    echo "data: " . json_encode(['error' => $e->getMessage()]) . "\n\n";
-                    flush();
+                    \Log::error('Error saving streamed message: ' . $e->getMessage());
                 }
+
             }, 200, [
                 'Content-Type' => 'text/event-stream',
                 'Cache-Control' => 'no-cache',
