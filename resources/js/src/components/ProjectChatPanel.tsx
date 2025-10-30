@@ -5,6 +5,23 @@ import ModelSelector from './ModelSelector';
 import { useTheme } from '../contexts/ThemeContext';
 import { generateUUID } from '../utils/uuid';
 
+// Suggestion pills for quick actions
+const SUGGESTIONS = [
+  { label: 'Explain code', icon: '💡' },
+  { label: 'Fix bugs', icon: '🐛' },
+  { label: 'Optimize', icon: '⚡' },
+  { label: 'Add tests', icon: '✅' },
+];
+
+// Example prompts
+const EXAMPLE_PROMPTS = [
+  'Help me refactor this component',
+  'Explain the architecture of this project',
+  'Find potential security issues',
+  'Suggest performance improvements',
+  'Write documentation for this code',
+];
+
 export type ProjectChatItem = {
   id: string;
   apiId?: number;
@@ -33,11 +50,10 @@ export default function ProjectChatPanel({ conversationId: initialConversationId
   const [items, setItems] = useState<ProjectChatItem[]>([]);
   const [conversationId, setConversationId] = useState<number | null>(initialConversationId || null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
-  const [models, setModels] = useState<ApiModelItem[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingContent, setEditingContent] = useState('');
-  const [justSent, setJustSent] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -45,14 +61,22 @@ export default function ProjectChatPanel({ conversationId: initialConversationId
       try {
         let list = await ModelsAPI.list();
         if (!list || list.length === 0) list = FALLBACK_MODELS;
-        setModels(list);
         if (list.length > 0) setSelectedModel(list[0].model_id);
       } catch {
-        setModels(FALLBACK_MODELS);
         if (FALLBACK_MODELS.length > 0) setSelectedModel(FALLBACK_MODELS[0].model_id);
       }
     })();
   }, []);
+
+  // Auto-scroll to bottom when new messages are added
+  useEffect(() => {
+    if (items.length > 0 && chatEndRef.current) {
+      const timeoutId = setTimeout(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 50);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [items]);
 
   // Load conversation if ID is provided
   useEffect(() => {
@@ -71,123 +95,32 @@ export default function ProjectChatPanel({ conversationId: initialConversationId
     isLoading: false
   });
 
-  const handleEditMessage = (id: string, content: string) => {
-    setItems(prev => prev.map(item => 
-      item.id === id 
-        ? { ...item, isEditing: true } 
-        : item
-    ));
-    setEditingId(id);
-    setEditingContent(content);
+  // File handling
+  const handleFileAttachment = () => {
+    fileInputRef.current?.click();
   };
 
-  const saveEdit = async (id: string) => {
-    if (!editingContent.trim()) return;
-    
-    setItems(prev => prev.map(item => 
-      item.id === id 
-        ? { ...item, content: editingContent, isEditing: false } 
-        : item
-    ));
-    
-    // Here you would typically call an API to update the message
-    // await updateMessage(conversationId, id, editingContent);
-    
-    setEditingId(null);
-  };
-
-  const cancelEdit = (id: string, originalContent: string) => {
-    setItems(prev => prev.map(item => 
-      item.id === id 
-        ? { ...item, isEditing: false } 
-        : item
-    ));
-    setEditingContent(originalContent);
-    setEditingId(null);
-  };
-
-  const regenerateResponse = async (messageId: string) => {
-    // Find the message to regenerate
-    const messageIndex = items.findIndex(item => item.id === messageId);
-    if (messageIndex === -1 || messageIndex === 0) return;
-    
-    // Get the previous user message
-    const prevMessage = items[messageIndex - 1];
-    if (prevMessage.role !== 'user') return;
-    
-    // Mark the message as loading
-    setItems(prev => prev.map((item, idx) => 
-      idx === messageIndex ? { ...item, isLoading: true } : item
-    ));
-    
-    try {
-      // Stream regeneration into the same assistant message slot
-      let accumulated = '';
-      await ChatAPI.sendStream(
-        {
-          model: selectedModel || '',
-          message: prevMessage.content,
-          conversation_id: conversationId ?? undefined,
-          project_id: projectId ? Number(projectId) : undefined,
-        },
-        (token) => {
-          accumulated += token;
-          setItems(prev => prev.map((item, idx) => idx === messageIndex ? { ...item, content: accumulated } : item));
-        },
-        (info) => {
-          if (info?.conversation_id && !conversationId) setConversationId(info.conversation_id);
-        }
-      );
-      setItems(prev => prev.map((item, idx) => idx === messageIndex ? { ...item, isLoading: false } : item));
-    } catch (error) {
-      console.error('Failed to regenerate response:', error);
-      setItems(prev => prev.map((item, idx) => 
-        idx === messageIndex 
-          ? { 
-              ...item, 
-              isLoading: false,
-              content: 'Failed to regenerate response. Please try again.'
-            } 
-          : item
-      ));
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      const newFiles = Array.from(files);
+      setAttachedFiles(prev => [...prev, ...newFiles]);
+    }
+    // Reset input value to allow selecting the same file again
+    if (e.target) {
+      e.target.value = '';
     }
   };
-  
-  const continueGeneration = async (messageId: string) => {
-    // Find the last message
-    const lastMessage = items[items.length - 1];
-    if (lastMessage.id !== messageId || lastMessage.role !== 'assistant') return;
-    
-    // Mark as loading
-    setItems(prev => prev.map(item => 
-      item.id === messageId 
-        ? { ...item, isLoading: true } 
-        : item
-    ));
-    
-    try {
-      // Call continue API (adjust based on your API)
-      const res = await ChatAPI.continueGeneration({
-        conversation_id: conversationId!,
-        message_id: parseInt(messageId),
-        model: selectedModel || ''
-      });
-      
-      // Update the conversation
-      await openConversation(res.conversation_id);
-      setConversationId(res.conversation_id);
-    } catch (error) {
-      console.error('Failed to continue generation:', error);
-      setItems(prev => prev.map(item => 
-        item.id === messageId 
-          ? { 
-              ...item, 
-              isLoading: false,
-              content: item.content + '\n[Failed to continue generation]'
-            } 
-          : item
-      ));
-    }
+
+  const removeAttachedFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (!bytes) return '0 Bytes';
+    const k = 1024;
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${['Bytes', 'KB', 'MB', 'GB'][i]}`;
   };
 
   const openConversation = async (id: number) => {
@@ -203,12 +136,12 @@ export default function ProjectChatPanel({ conversationId: initialConversationId
 
   const handleSend = () => {
     const text = message.trim();
-    if (!text) return;
+    if (!text || isStreaming) return;
+
     const userItem: ProjectChatItem = { id: generateUUID(), role: 'user', content: text };
     setItems(prev => [...prev, userItem]);
     setMessage('');
-    setJustSent(true);
-    setTimeout(() => setJustSent(false), 600);
+    setAttachedFiles([]); // Clear attached files after sending
 
     (async () => {
       if (!selectedModel) {
@@ -216,6 +149,8 @@ export default function ProjectChatPanel({ conversationId: initialConversationId
         setItems(prev => [...prev, assistantItem]);
         return;
       }
+
+      setIsStreaming(true);
       try {
         const assistantId = generateUUID();
         let accumulated = '';
@@ -241,189 +176,278 @@ export default function ProjectChatPanel({ conversationId: initialConversationId
       } catch (e: any) {
         const assistantItem: ProjectChatItem = { id: generateUUID(), role: 'assistant', content: `Error contacting server: ${e?.message ?? 'Unknown error'}` };
         setItems(prev => [...prev, assistantItem]);
+      } finally {
+        setIsStreaming(false);
       }
     })();
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Chat Area with same design as main conversation */}
-      <section className="flex justify-center px-4 sm:px-6 pt-8 sm:pt-14 pb-4 flex-1 overflow-y-auto">
-        <div className="relative w-full max-w-[1280px] rounded-[16px] sm:rounded-[22px]" style={{
-          border: '1px solid var(--border-secondary)',
+    <div className="flex flex-col h-full w-full" style={{ backgroundColor: 'var(--bg-primary)' }}>
+      {/* Chat Area */}
+      <section className="flex justify-center px-2 xs:px-4 sm:px-6 pt-3 xs:pt-4 sm:pt-5 flex-1 overflow-hidden">
+        {/* Centered rounded panel */}
+        <div className="relative w-full max-w-[980px] rounded-xl xs:rounded-[16px] sm:rounded-[22px] flex flex-col h-full overflow-hidden" style={{
           backgroundColor: theme === 'dark' ? 'rgba(26, 21, 32, 0.4)' : 'rgba(248, 249, 250, 0.8)',
           boxShadow: 'var(--shadow-secondary)'
         }}>
-          <div className="pointer-events-none absolute inset-0 rounded-[16px] sm:rounded-[22px] bg-[radial-gradient(1200px_400px_at_50%_-200px,rgba(255,255,255,0.05),rgba(0,0,0,0))]" />
-          <div className="relative flex w-full flex-col gap-4 sm:gap-6 px-4 sm:px-6 lg:px-10 py-6 sm:py-10 min-h-[400px]">
+          <div className="relative flex w-full flex-col gap-3 xs:gap-4 sm:gap-6 px-3 xs:px-4 sm:px-6 lg:px-10 py-4 xs:py-6 sm:pt-10 flex-1 overflow-y-auto" style={{ overflowX: 'hidden' }}>
             {items.length === 0 ? (
-              <div className="flex flex-col items-center gap-4 sm:gap-6 justify-center flex-1">
-                <h2 className="m-0 text-xl sm:text-2xl lg:text-3xl font-bold text-center leading-tight px-2">
-                  How can I help you with this project?
-                </h2>
-                <p className="text-sm text-[var(--text-secondary)] text-center max-w-md">
-                  Start a conversation below. All messages will be saved to this project.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {items.map((it, index) => (
-                  <div key={it.id} className={`group relative max-w-[85%] flex ${it.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className="relative">
-                    <div
-                      className={`rounded-2xl px-4 py-3 text-[15px]`}
+              <div className="flex flex-col items-center gap-3 xs:gap-4 sm:gap-6">
+                {/* Main Heading */}
+                <h1 className="m-0 text-xl xs:text-2xl sm:text-3xl lg:text-[44px] font-extrabold text-center leading-tight px-2">
+                  How can I help you?
+                </h1>
+
+                {/* Suggestion Pills */}
+                <div className="flex flex-wrap justify-center gap-1.5 xs:gap-2">
+                  {SUGGESTIONS.map((s) => (
+                    <button
+                      key={s.label}
+                      className="inline-flex items-center gap-1.5 xs:gap-2 rounded-full px-2.5 xs:px-3 sm:px-4 py-1.5 xs:py-2 text-xs sm:text-sm transition-colors cursor-pointer whitespace-nowrap"
                       style={{
-                        backgroundColor: it.role === 'user' 
-                          ? theme === 'dark' ? 'var(--bg-quaternary)' : '#fee2e2'
-                          : theme === 'dark' ? 'var(--bg-tertiary)' : '#dbeafe',
-                        border: `1px solid ${it.role === 'user' 
-                          ? theme === 'dark' ? 'var(--border-secondary)' : '#fecaca'
-                          : theme === 'dark' ? 'var(--border-secondary)' : '#bfdbfe'}`,
+                        border: '1px solid var(--border-primary)',
+                        backgroundColor: 'var(--bg-quaternary)',
                         color: 'var(--text-primary)'
                       }}
+                      onClick={() => setMessage(s.label)}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover-light)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-quaternary)';
+                      }}
                     >
-                      {it.isEditing ? (
-                        <div>
-                          <textarea
-                            value={editingContent}
-                            onChange={(e) => setEditingContent(e.target.value)}
-                            onKeyDown={async (e) => {
-                              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                                e.preventDefault();
-                                await saveEdit(it.id);
-                              } else if (e.key === 'Escape') {
-                                e.preventDefault();
-                                cancelEdit(it.id, it.content);
-                              }
-                            }}
-                            rows={3}
-                            className="w-full bg-transparent outline-none resize-vertical"
-                            style={{ color: 'inherit' }}
-                            placeholder="Edit message..."
-                          />
-                          <div className={`mt-2 flex gap-2 ${it.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <button
-                              className="px-2 py-1 rounded text-xs"
-                              style={{ border: '1px solid var(--border-secondary)', background: 'var(--bg-quaternary)', color: 'var(--text-primary)' }}
-                              onClick={() => saveEdit(it.id)}
-                            >
-                              Save (Ctrl/Cmd+Enter)
-                            </button>
-                            <button
-                              className="px-2 py-1 rounded text-xs"
-                              style={{ border: '1px solid var(--border-secondary)', background: 'var(--bg-quaternary)', color: 'var(--text-primary)' }}
-                              onClick={() => cancelEdit(it.id, it.content)}
-                            >
-                              Cancel (Esc)
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <Markdown>{it.content}</Markdown>
-                      )}
-                    </div>
-                    
-                    {!it.isEditing && it.role === 'user' && !justSent && (
-                      <button
-                        type="button"
-                        className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 transition"
-                        style={{ color: 'var(--text-tertiary)' }}
-                        title="Edit Message"
-                        onClick={() => handleEditMessage(it.id, it.content)}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M12 20h9"/>
-                          <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
-                        </svg>
-                      </button>
-                    )}
-                    
-                    {!it.isEditing && it.role === 'assistant' && !justSent && (
-                      <button
-                        type="button"
-                        className="absolute top-1 left-1 p-1 rounded opacity-0 group-hover:opacity-100 transition"
-                        style={{ color: 'var(--text-tertiary)' }}
-                        title="Regenerate"
-                        onClick={() => regenerateResponse(it.id)}
-                        disabled={it.isLoading}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M21 12a9 9 0 1 1-3-6.7"/>
-                          <polyline points="21 3 21 9 15 9"/>
-                        </svg>
-                      </button>
-                    )}
-                    
-                    {it.isLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-10 rounded-2xl">
-                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-[var(--accent-primary)]"></div>
-                      </div>
-                    )}
+                      <span className="text-sm xs:text-base">{s.icon}</span>
+                      <span className="hidden xs:inline">{s.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Example Prompts List */}
+                <ul className="mt-3 xs:mt-4 sm:mt-6 w-full max-w-[720px] list-none p-0" style={{ borderTop: '1px solid var(--border-tertiary)' }}>
+                  {EXAMPLE_PROMPTS.map((prompt, idx) => (
+                    <li
+                      key={idx}
+                      className="py-2 xs:py-2.5 sm:py-3.5 cursor-pointer transition-colors text-xs xs:text-sm sm:text-[15px] px-2 sm:px-0"
+                      style={{
+                        color: 'var(--text-quaternary)',
+                        borderBottom: idx < EXAMPLE_PROMPTS.length - 1 ? '1px solid var(--border-tertiary)' : 'none'
+                      }}
+                      onClick={() => setMessage(prompt)}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.color = 'var(--text-quaternary)';
+                      }}
+                    >
+                      {prompt}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 xs:gap-4">
+                {items.map((it) => (
+                  <div
+                    key={it.id}
+                    className={`flex ${it.role === 'user' ? 'justify-end' : 'justify-start'} mb-2 xs:mb-4`}
+                  >
+                    <div
+                      className={`max-w-[85%] xs:max-w-[80%] sm:max-w-[75%] rounded-xl xs:rounded-2xl text-xs xs:text-sm sm:text-[15px] ${it.content ? 'px-3 xs:px-4 py-2 xs:py-3' : ''}`}
+                      style={{
+                        backgroundColor: it.role === 'user'
+                          ? 'var(--accent-primary)'
+                          : theme === 'dark' ? '#374151' : '#f3f4f6',
+                        color: it.role === 'user'
+                          ? 'white'
+                          : 'var(--text-primary)',
+                        border: it.role === 'assistant' ? '1px solid var(--border-primary)' : 'none'
+                      }}
+                    >
+                      <Markdown>{it.content || ''}</Markdown>
                     </div>
                   </div>
                 ))}
+
+                {/* Streaming Indicator - Shows when AI is generating response */}
+                {isStreaming && (
+                  <div className="flex justify-start mb-2 xs:mb-4">
+                    <div
+                      className="rounded-xl xs:rounded-2xl px-3 xs:px-4 py-2 xs:py-3"
+                      style={{
+                        backgroundColor: theme === 'dark' ? '#374151' : '#f3f4f6',
+                        border: '1px solid var(--border-primary)'
+                      }}
+                    >
+                      <div className="flex gap-1.5 items-center">
+                        <span className="w-1.5 xs:w-2 h-1.5 xs:h-2 bg-[var(--text-secondary)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                        <span className="w-1.5 xs:w-2 h-1.5 xs:h-2 bg-[var(--text-secondary)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                        <span className="w-1.5 xs:w-2 h-1.5 xs:h-2 bg-[var(--text-secondary)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div ref={chatEndRef} />
               </div>
             )}
           </div>
         </div>
       </section>
-      
-      {/* Footer / Input Area with same design */}
-      <footer className="px-4 sm:px-6 pb-4 sm:pb-7">
-        <div className="mx-auto w-full max-w-[1280px]">
-          <div className="relative flex flex-col rounded-xl sm:rounded-2xl p-2 sm:p-3" style={{
+
+      {/* Footer / Input Area */}
+      <footer className="px-2 xs:px-4 sm:px-6 pb-3 xs:pb-4 sm:pb-7">
+        {/* Input Container constrained to panel width */}
+        <div className="mx-auto w-full max-w-[980px]">
+          <div className="relative flex flex-col rounded-lg xs:rounded-xl sm:rounded-2xl p-2.5 xs:p-3 sm:p-4" style={{
             border: '1px solid var(--border-secondary)',
             backgroundColor: 'var(--bg-secondary)',
             boxShadow: 'var(--shadow-tertiary)'
           }}>
-            <form
-              onSubmit={(e) => { e.preventDefault(); (document.activeElement as HTMLElement | null)?.blur?.(); handleSend(); }}
-              className="flex flex-col"
-            >
-              <input
-                className="flex flex-1 bg-transparent px-2 sm:px-3 pt-2.5 pb-16 sm:pb-20 outline-none text-sm sm:text-[15px]"
-                style={{ color: 'var(--text-primary)', '--placeholder-color': 'var(--text-tertiary)' } as React.CSSProperties & { '--placeholder-color': string }}
-                placeholder="Type your message here..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-              />
-              <div className='flex items-center justify-between flex-wrap gap-2'>
-                <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                  {/* Model Selector Dropdown (paginated) */}
+            {/* Attached Files Display */}
+            {attachedFiles.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 xs:gap-2 mb-2 xs:mb-3">
+                {attachedFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-1.5 xs:gap-2 rounded-md xs:rounded-lg px-2 xs:px-3 py-1.5 xs:py-2 text-[10px] xs:text-xs"
+                    style={{
+                      backgroundColor: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-secondary)'
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="xs:w-[14px] xs:h-[14px] flex-shrink-0">
+                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                    <span className="truncate max-w-[80px] xs:max-w-[120px]" title={file.name}>
+                      {file.name}
+                    </span>
+                    <span className="text-[var(--text-tertiary)] hidden xs:inline">
+                      ({formatFileSize(file.size)})
+                    </span>
+                    <button
+                      onClick={() => removeAttachedFile(index)}
+                      className="ml-0.5 xs:ml-1 p-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors cursor-pointer flex-shrink-0"
+                      aria-label="Remove file"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="xs:w-[12px] xs:h-[12px]">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Streaming Status Indicator */}
+            {isStreaming && (
+              <div className="flex items-center gap-1.5 xs:gap-2 mb-2 text-[10px] xs:text-xs text-[var(--text-secondary)]">
+                <div className="flex gap-1">
+                  <span className="w-1 xs:w-1.5 h-1 xs:h-1.5 bg-[var(--accent-primary)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-1 xs:w-1.5 h-1 xs:h-1.5 bg-[var(--accent-primary)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-1 xs:w-1.5 h-1 xs:h-1.5 bg-[var(--accent-primary)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                </div>
+                <span className="hidden xs:inline">AI is responding...</span>
+              </div>
+            )}
+
+            {/* Text Input */}
+            <textarea
+              className="flex-1 bg-transparent px-0 py-1.5 xs:py-2 outline-none text-xs xs:text-sm sm:text-[15px] resize-none min-h-[36px] xs:min-h-[40px] max-h-[100px] xs:max-h-[120px]"
+              style={{ color: 'var(--text-primary)', '--placeholder-color': 'var(--text-tertiary)' } as React.CSSProperties & { '--placeholder-color': string }}
+              placeholder={isStreaming ? "AI is responding..." : "Type your message here..."}
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              rows={1}
+              disabled={isStreaming}
+            />
+
+            {/* Hidden File Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.doc,.docx,.txt,.csv,.json"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            {/* Bottom Controls */}
+            <div className="flex items-center justify-between mt-2 xs:mt-3 pt-2 xs:pt-3" style={{ borderTop: '1px solid var(--border-tertiary)' }}>
+              <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 flex-wrap">
+                {/* Model Selector - Mobile optimized */}
+                <div className="flex-shrink-0">
                   <ModelSelector
                     selectedModelId={selectedModel ?? undefined}
-                    onModelChange={(id) => setSelectedModel(id)}
+                    onModelChange={setSelectedModel}
                   />
                 </div>
-                <button type="submit"
-                  className="grid h-8 w-8 sm:h-10 sm:w-10 place-items-center rounded-lg sm:rounded-xl text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                  style={{ backgroundColor: 'var(--accent-primary)' }}
-                  disabled={!message.trim()}
-                  onMouseEnter={e => {
-                    if (!e.currentTarget.disabled) {
-                      e.currentTarget.style.backgroundColor = 'var(--accent-hover)';
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (!e.currentTarget.disabled) {
-                      e.currentTarget.style.backgroundColor = 'var(--accent-primary)';
-                    }
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="sm:w-[18px] sm:h-[18px]">
-                    <line x1="12" y1="19" x2="12" y2="5" />
-                    <polyline points="5 12 12 5 19 12" />
+
+                {/* Search Button - Hidden on very small screens */}
+                <button className="hidden sm:flex items-center gap-2 rounded-lg px-2.5 xs:px-3 py-1.5 xs:py-2 text-xs transition-colors cursor-pointer" style={{
+                  border: '1px solid var(--border-secondary)',
+                  backgroundColor: 'var(--bg-quaternary)',
+                  color: 'var(--text-primary)'
+                }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="xs:w-[14px] xs:h-[14px]">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
                   </svg>
+                  <span className="hidden md:inline">Search</span>
+                </button>
+
+                {/* Attachment Button */}
+                <button
+                  className="relative p-1.5 xs:p-2 rounded-md xs:rounded-lg transition-colors hover:bg-[var(--bg-hover-light)] cursor-pointer flex-shrink-0"
+                  onClick={handleFileAttachment}
+                  title="Attach files"
+                  style={{
+                    '--hover-bg': 'var(--bg-hover-light)',
+                    color: attachedFiles.length > 0 ? 'var(--accent-primary)' : 'var(--text-primary)'
+                  } as React.CSSProperties & { '--hover-bg': string }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="xs:w-[16px] xs:h-[16px]">
+                    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  </svg>
+                  {attachedFiles.length > 0 && (
+                    <span className="absolute -top-0.5 xs:-top-1 -right-0.5 xs:-right-1 bg-[var(--accent-primary)] text-white text-[10px] xs:text-xs rounded-full w-4 h-4 xs:w-5 xs:h-5 flex items-center justify-center">
+                      {attachedFiles.length}
+                    </span>
+                  )}
                 </button>
               </div>
-            </form>
+
+              {/* Send Button */}
+              <button
+                onClick={handleSend}
+                disabled={!message.trim() || isStreaming}
+                className="grid h-7 w-7 xs:h-8 xs:w-8 sm:h-10 sm:w-10 place-items-center rounded-md xs:rounded-lg sm:rounded-xl text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                style={{ backgroundColor: 'var(--accent-primary)' }}
+                onMouseEnter={e => {
+                  if (!e.currentTarget.disabled) {
+                    e.currentTarget.style.backgroundColor = 'var(--accent-hover)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!e.currentTarget.disabled) {
+                    e.currentTarget.style.backgroundColor = 'var(--accent-primary)';
+                  }
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="xs:w-[14px] xs:h-[14px] sm:w-[18px] sm:h-[18px]">
+                  <line x1="12" y1="19" x2="12" y2="5" />
+                  <polyline points="5 12 12 5 19 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </footer>

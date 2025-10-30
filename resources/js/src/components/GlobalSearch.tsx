@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SearchAPI, type SearchResult, type SearchResponse } from '../api/client';
+import { SearchAPI, type SearchResult } from '../api/client';
 
 interface GlobalSearchProps {
   isOpen: boolean;
@@ -22,7 +22,6 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose, onSelectRe
     }
   }, [isOpen]);
 
-  // Handle search
   const handleSearch = async (searchQuery: string = query) => {
     if (!searchQuery.trim()) {
       setResults([]);
@@ -31,17 +30,13 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose, onSelectRe
 
     setLoading(true);
     try {
-      let response: SearchResponse;
-      
-      if (searchType === 'web') {
-        response = await SearchAPI.webSearch(searchQuery.trim());
-      } else {
-        response = await SearchAPI.search({
-          query: searchQuery.trim(),
-          type: searchType === 'all' ? undefined : searchType,
-          limit: 20
-        });
-      }
+      const response = searchType === 'web' 
+        ? await SearchAPI.webSearch(searchQuery.trim())
+        : await SearchAPI.search({
+            query: searchQuery.trim(),
+            type: searchType === 'all' ? undefined : searchType,
+            limit: 20
+          });
       
       setResults(response.results);
       setSearchTime(response.search_time_ms);
@@ -55,71 +50,36 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose, onSelectRe
 
   // Debounced search
   useEffect(() => {
-    const debounceTimer = setTimeout(() => {
-      if (query.trim()) {
-        handleSearch();
-      } else {
-        setResults([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(debounceTimer);
+    const timer = setTimeout(() => query.trim() ? handleSearch() : setResults([]), 300);
+    return () => clearTimeout(timer);
   }, [query, searchType]);
 
-  // Handle keyboard shortcuts
+  // Handle Escape key
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
-    }
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+  const formatDate = (dateString?: string) => 
+    dateString ? new Date(dateString).toLocaleDateString(undefined, {
+      month: 'short', day: 'numeric', year: 'numeric'
+    }) : '';
+
+  const iconPaths: Record<string, string> = {
+    conversation: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z",
+    message: "M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 4z",
+    web: "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z",
   };
 
-  const getResultIcon = (type: string) => {
-    switch (type) {
-      case 'conversation':
-        return (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-        );
-      case 'message':
-        return (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 4z" />
-          </svg>
-        );
-      case 'web':
-        return (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="2" y1="12" x2="22" y2="12" />
-            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-          </svg>
-        );
-      default:
-        return (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" />
-            <path d="M21 21l-4.35-4.35" />
-          </svg>
-        );
-    }
-  };
+  const getResultIcon = (type: string) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      {type === 'web' && <circle cx="12" cy="12" r="10" />}
+      {type === 'web' && <line x1="2" y1="12" x2="22" y2="12" />}
+      <path d={iconPaths[type] || "M11 11m-8 0a8 8 0 1 0 16 0a8 8 0 1 0 -16 0M21 21l-4.35-4.35"} />
+    </svg>
+  );
 
   if (!isOpen) return null;
 
@@ -190,21 +150,24 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose, onSelectRe
               { key: 'all', label: 'All', icon: '🔍' },
               { key: 'conversations', label: 'Conversations', icon: '💬' },
               { key: 'web', label: 'Web', icon: '🌐' }
-            ].map((type) => (
-              <button
-                key={type.key}
-                onClick={() => setSearchType(type.key as any)}
-                className="px-3 py-1.5 rounded-full text-sm transition-colors flex items-center gap-2"
-                style={{
-                  backgroundColor: searchType === type.key ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                  color: searchType === type.key ? 'white' : 'var(--text-primary)',
-                  border: `1px solid ${searchType === type.key ? 'var(--accent-primary)' : 'var(--border-secondary)'}`
-                }}
-              >
-                <span>{type.icon}</span>
-                {type.label}
-              </button>
-            ))}
+            ].map(({ key, label, icon }) => {
+              const isActive = searchType === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setSearchType(key as any)}
+                  className="px-3 py-1.5 rounded-full text-sm transition-colors flex items-center gap-2"
+                  style={{
+                    backgroundColor: isActive ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                    color: isActive ? 'white' : 'var(--text-primary)',
+                    border: `1px solid ${isActive ? 'var(--accent-primary)' : 'var(--border-secondary)'}`
+                  }}
+                >
+                  <span>{icon}</span>
+                  {label}
+                </button>
+              );
+            })}
           </div>
           
           {/* Search Stats */}
